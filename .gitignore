@@ -2,3 +2,6 @@ outputs/
 *.pth
 *.pt
 __pycache__
+
+*.mp4
+*.gif
