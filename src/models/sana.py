@@ -15,4 +15,6 @@ def get_sana_pipeline(cache_dir: Optional[str] = None):
     pipe.vae.to(torch.bfloat16)
     pipe.text_encoder.to(torch.bfloat16)
 
+    pipe.set_progress_bar_config(disable=True)
+
     return pipe
