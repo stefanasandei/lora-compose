@@ -1,2 +1,5 @@
 cache_dir: /mnt/sda3/Documents/Models/
 dataset_dir: /home/stefan/Downloads/seinfeld-dataset
+num_seeds: 5
+lora_path: null
+lora_name: null

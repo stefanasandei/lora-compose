@@ -1,9 +1,13 @@
 from diffusers import SanaPipeline
 import torch
 from typing import Optional
+import logging
 
 
 def get_sana_pipeline(cache_dir: Optional[str] = None):
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("huggingface_hub").setLevel(logging.WARNING)
+
     pipe = SanaPipeline.from_pretrained(
         "Efficient-Large-Model/SANA_600M_1024px_diffusers",
         cache_dir=cache_dir,
