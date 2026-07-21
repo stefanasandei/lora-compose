@@ -1,0 +1,29 @@
+defaults:
+  - base
+  - _self_
+
+character: jerry
+
+lora:
+  method: lora
+  r: 32
+  alpha: 64
+  target_modules: ".*\\.(to_k|to_q|to_v|to_out\\.0)"
+  dropout: 0.0
+  bias: none
+
+train:
+  epochs: 250
+  lr: 1.0e-4
+  batch_size: 1
+  seed: 42
+  max_grad_norm: 1.0
+
+sample_prompts:
+  - "Jerry Seinfeld stands in his kitchen, his body facing forward and his head tilted slightly down. He is dressed in a gray tweed wool blazer speckled with flecks of blue and brown, featuring wide notched lapels, layered over a button-down shirt with vertical stripes in pale blue, white, and soft gray, and a distinctive band collar (no fold-down collar) with small buttons running down the placket. The kitchen behind him is a clutter of pantry items: dark wooden shelves are stocked with red boxes of cereal, a green can, and other packaged goods, while a stainless steel refrigerator on the left is plastered with a newspaper, a small white note, and a red clipping. On the right, a partial view of another person in a dark green jacket is visible. The lighting is warm and slightly dim, typical of an indoor sitcom set."
+  - "Jerry Seinfeld wearing a suit on stage"
+  - "a portrait of Jerry Seinfeld, high quality"
+  - "Jerry Seinfeld sitting on a couch"
+  - "Jerry Seinfeld performs stand-up comedy on a dark stage, his body facing slightly to the right and his head turned to address the audience. He wears a deep purple or plum wool blazer with wide notched lapels, layered over a bright light-blue or aqua dress shirt and a dark patterned necktie with small geometric motifs. His left hand is raised to chest level, fingers spread in an explanatory gesture. A black microphone on a tall black stand is positioned directly in front of him. The background is mostly black, with the soft, vertical folds of a beige or cream-colored curtain barely visible on the left, and a hint of a deep red velvet curtain or drape on the far left edge. The lighting is dramatic, with a single bright spotlight illuminating Jerry from the front, leaving the rest of the stage in deep shadow, capturing the intimate, focused atmosphere of a comedy club."
+
+output_dir: ./outputs/${character}_${lora.method}_r${lora.r}
