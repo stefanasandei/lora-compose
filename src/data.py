@@ -8,7 +8,6 @@ import torch
 from PIL import Image
 from tqdm import tqdm
 
-
 log = logging.getLogger(__name__)
 
 
@@ -43,7 +42,7 @@ def list_dataset_pairs(character_dir: str) -> list[dict]:
 
 
 @torch.no_grad()
-def cache_text_embeddings(pipe, pairs: list[dict], cache_path: str, max_sequence_length):
+def cache_text_embeddings(pipe, pairs: list[dict], cache_path: str):
     if os.path.exists(cache_path):
         log.info(f"Text embeddings cache found at {cache_path}")
         return
@@ -54,7 +53,7 @@ def cache_text_embeddings(pipe, pairs: list[dict], cache_path: str, max_sequence
         prompt_embeds, prompt_attention_mask, _, _ = pipe.encode_prompt(
             item["caption"],
             do_classifier_free_guidance=False,
-            max_sequence_length=max_sequence_length,
+            max_sequence_length=4096,
         )
         embeds[item["basename"]] = {
             "prompt_embeds": prompt_embeds.cpu(),

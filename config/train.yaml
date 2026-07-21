@@ -7,13 +7,13 @@ character: jerry
 lora:
   method: lora
   r: 32
-  alpha: 64
+  alpha: 32
   target_modules: ".*\\.(to_k|to_q|to_v|to_out\\.0)"
   dropout: 0.0
   bias: none
 
 train:
-  epochs: 250
+  epochs: 200
   lr: 1.0e-4
   batch_size: 1
   seed: 42

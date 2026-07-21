@@ -78,7 +78,7 @@ def run_training(cfg: DictConfig) -> None:
     text_cache = os.path.join(character_dir, "text_embeddings.pth")
     vae_cache = os.path.join(character_dir, "vae_latents.pth")
 
-    pipe = get_sana_pipeline(cache_dir=cfg.cache_dir)
+    pipe = get_sana_pipeline(model_name_or_path=cfg.model_name_or_path, cache_dir=cfg.cache_dir)
     log.info("Pipeline loaded")
 
     noise_scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(
@@ -134,41 +134,40 @@ def run_training(cfg: DictConfig) -> None:
             optimizer.zero_grad()
 
             epoch_loss += loss.item()
+            wandb.log({"loss": loss.item()})
 
         # 3.1 stats for nerds after the end of each epoch
         avg_loss = epoch_loss / len(dataloader)
         log.info(f"Epoch {epoch} average loss: {avg_loss:.4f}")
-        wandb.log({"loss": avg_loss, "epoch": epoch}, step=epoch)
 
         if epoch % 50 == 0:
             pipe.transformer.eval()
 
-            samples = []
-            for i, prompt in enumerate(cfg.sample_prompts):
-                generator = torch.manual_seed(cfg.train.seed + i)
-                image = pipe(
-                    prompt=prompt,
-                    num_inference_steps=20,
-                    height=1024,
-                    width=1024,
-                    generator=generator,
-                    guidance_scale=3.8,
-                ).images[0]
-                samples.append(wandb.Image(image, caption=f"epoch {epoch}: {prompt[:60]}"))
-            wandb.log({"samples": samples, "epoch": epoch}, step=epoch)
+            images = sample_prompts(
+                pipe, cfg.sample_prompts, output_dir=None,
+                seed=cfg.train.seed,
+                num_inference_steps=20, height=1024, width=1024, guidance_scale=3.8,
+            )
+            samples = [
+                wandb.Image(img, caption=f"epoch {epoch}: {prompt[:60]}")
+                for img, prompt in zip(images, cfg.sample_prompts)
+            ]
+            wandb.log({"samples": samples}, step=epoch)
 
             pipe.transformer.train()
             torch.cuda.empty_cache()
 
     # 4. after training, save lora and do final samples
+    pipe.transformer.eval()
+
     adapter_path = os.path.join(output_dir, f"epoch_{cfg.train.epochs}")
     pipe.transformer.save_pretrained(adapter_path)
     log.info(f"Saved adapter to {adapter_path}")
 
     log.info("Training complete. Sampling...")
     sample_dir = os.path.join(output_dir, "samples")
-    sample_prompts(pipe, cfg.sample_prompts, sample_dir,seed=cfg.train.seed)
-    
+    sample_prompts(pipe, cfg.sample_prompts, sample_dir, seed=cfg.train.seed)
+
     wandb.finish()
 
 

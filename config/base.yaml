@@ -1,2 +1,3 @@
 cache_dir: /mnt/sda3/Documents/Models/
+model_name_or_path: /mnt/sda3/Documents/Models/SANA1.5_1.6B_1024px_diffusers
 dataset_dir: /home/stefan/Downloads/seinfeld-dataset

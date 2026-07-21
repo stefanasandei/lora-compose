@@ -2,7 +2,7 @@ defaults:
   - base
   - _self_
 
-num_seeds: 5
-lora_path: /home/stefan/Documents/lora-composition/outputs/jerry_lora_r512/epoch_500
+num_seeds: 2
+lora_path: /home/stefan/Documents/lora-composition/outputs/jerry_lora_r32/epoch_200
 lora_name: lora_r512
 character: jerry
