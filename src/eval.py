@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 
+from diffusers.pipelines.sana.pipeline_sana import SanaPipeline
 from transformers import AutoImageProcessor, AutoProcessor, Dinov2Model, CLIPModel
 import torch.nn.functional as F
 import torch
@@ -16,8 +17,7 @@ from peft import PeftModel
 from torchmetrics.image import LearnedPerceptualImagePatchSimilarity
 from torchvision.transforms.functional import to_tensor
 
-from models.sana import get_sana_pipeline
-from reference import gen_reference_dataset
+from sana import get_sana_pipeline
 from sampling import sample_prompts
 
 log = logging.getLogger(__name__)
@@ -114,6 +114,12 @@ def compute_arcface_similarity(character_dir, output_dir, prompts, num_seeds, in
         return [0.0]
     return [sum(similarities) / len(similarities)]
 
+def gen_reference_dataset(pipe: SanaPipeline, prompts: list[dict], ref_dir: str, num_seeds: int):
+    sample_prompts(
+        pipe, [p["prompt"] for p in prompts], ref_dir,
+        seed=0, num_seeds=num_seeds,
+    )
+
 def run_eval(cfg: DictConfig) -> None:
     log.info("Running evaluation.")
 
@@ -121,10 +127,7 @@ def run_eval(cfg: DictConfig) -> None:
     with open(f"{cfg.dataset_dir}/evals/prompts.json") as f:
         prompts = json.loads(f.read())
 
-    lora_name = cfg.get("lora_name")
-    if not lora_name:
-        lora_name = os.path.basename(cfg.lora_path) if cfg.get("lora_path") else "nolora"
-
+    lora_name = cfg["lora_name"]
     ref_dir = f"{cfg.dataset_dir}/evals/reference"
     ref_ready = os.path.isdir(ref_dir) # images from base frozen model
 

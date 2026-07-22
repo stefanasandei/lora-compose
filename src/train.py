@@ -12,8 +12,8 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from data import CachedSanaDataset, cache_text_embeddings, cache_vae_latents, list_dataset_pairs, collate_fn
-from lora import apply_lora
-from models.sana import get_sana_pipeline
+from adapters import apply_adapter
+from sana import get_sana_pipeline
 from sampling import sample_prompts
 from utils import set_seed
 
@@ -62,7 +62,7 @@ def run_training(cfg: DictConfig) -> None:
     # 1. setup state
     set_seed(cfg.train.seed)
 
-    run_name = f"{cfg.character}_{cfg.lora.method}_{os.urandom(3).hex()}"
+    run_name = f"{cfg.character}_{cfg.adapter.method}_{os.urandom(3).hex()}"
     wandb.init(project="lora-composition", name=run_name, config=OmegaConf.to_container(cfg, resolve=True))
 
     character_dir = os.path.join(cfg.dataset_dir, cfg.character)
@@ -96,8 +96,8 @@ def run_training(cfg: DictConfig) -> None:
     dataset = CachedSanaDataset(pairs, text_cache, vae_cache)
     dataloader = DataLoader(dataset, batch_size=cfg.train.batch_size, shuffle=True, collate_fn=collate_fn)
 
-    # 2. setup lora parameters for training
-    pipe.transformer = apply_lora(pipe.transformer, cfg.lora)
+    # 2. setup adapter for training
+    pipe.transformer = apply_adapter(pipe.transformer, cfg.adapter)
     pipe.transformer.train()
 
     trainable_params = list(filter(lambda p: p.requires_grad, pipe.transformer.parameters()))
@@ -152,8 +152,8 @@ def run_training(cfg: DictConfig) -> None:
                 wandb.Image(img, caption=f"epoch {epoch}: {prompt[:60]}")
                 for img, prompt in zip(images, cfg.sample_prompts)
             ]
-            wandb.log({"samples": samples}, step=epoch)
-
+            wandb.log({"samples": samples, "epoch": epoch}, step=epoch)
+            
             pipe.transformer.train()
             torch.cuda.empty_cache()
 

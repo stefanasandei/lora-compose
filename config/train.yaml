@@ -4,7 +4,7 @@ defaults:
 
 character: jerry
 
-lora:
+adapter:
   method: lora
   r: 32
   alpha: 32
@@ -13,7 +13,7 @@ lora:
   bias: none
 
 train:
-  epochs: 200
+  epochs: 300
   lr: 1.0e-4
   batch_size: 1
   seed: 42
@@ -26,4 +26,4 @@ sample_prompts:
   - "Jerry Seinfeld sitting on a couch"
   - "Jerry Seinfeld performs stand-up comedy on a dark stage, his body facing slightly to the right and his head turned to address the audience. He wears a deep purple or plum wool blazer with wide notched lapels, layered over a bright light-blue or aqua dress shirt and a dark patterned necktie with small geometric motifs. His left hand is raised to chest level, fingers spread in an explanatory gesture. A black microphone on a tall black stand is positioned directly in front of him. The background is mostly black, with the soft, vertical folds of a beige or cream-colored curtain barely visible on the left, and a hint of a deep red velvet curtain or drape on the far left edge. The lighting is dramatic, with a single bright spotlight illuminating Jerry from the front, leaving the rest of the stage in deep shadow, capturing the intimate, focused atmosphere of a comedy club."
 
-output_dir: ./outputs/${character}_${lora.method}_r${lora.r}
+output_dir: ./outputs/${character}_${adapter.method}_r${adapter.r}
