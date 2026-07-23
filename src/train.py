@@ -155,7 +155,7 @@ def run_training(cfg: DictConfig) -> None:
             pipe.transformer.train()
             torch.cuda.empty_cache()
 
-    # 4. after training, save lora and do final samples
+    # 4. after training, save adapter and do final samples
     pipe.transformer.eval()
 
     adapter_path = os.path.join(output_dir, f"epoch_{cfg.train.epochs}")

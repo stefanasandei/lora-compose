@@ -3,6 +3,6 @@ defaults:
   - _self_
 
 num_seeds: 2
-lora_path: /home/stefan/Documents/lora-composition/outputs/jerry_dreambooth_lora_r32/epoch_12
-lora_name: jerry_dreambooth_lora_r32
+lora_path: /home/stefan/Documents/lora-composition/outputs/jerry_oftv2_b32/epoch_200
+lora_name: jerry_oftv2_b32
 character: jerry

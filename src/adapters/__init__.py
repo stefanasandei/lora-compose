@@ -1,10 +1,11 @@
 from peft import get_peft_model
 
-from . import lora
+from . import lora, oftv2
 
 
 methods = {
     "lora": lora,
+    "oftv2": oftv2,
 }
 
 

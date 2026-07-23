@@ -10,6 +10,7 @@ Initially, we train single subject adapters to compare individual-concept method
 | ---------- | --------------- | --------------------- | ------------------ | ------------------ | ----------------- |
 | LoRA       | 0.792           | 0.320                 | 0.435              | 0.374              | 0.210             |
 | Dreambooth | 0.809           | 0.317                 | 0.431              | 0.263              | 0.120             |
+| OFTv2      | 0.802           | 0.322                 | 0.436              | 0.331              | 0.207             |
 
 ## Usage
 
@@ -26,8 +27,6 @@ Training configurations live together under `config/training`. To train a DreamB
 ```
 ./scripts/train.sh --config-name=training/dreambooth_lora
 ```
-
-Adapter parameterizations and training recipes are independent: `adapter.method` selects LoRA (and later DoRA or OFT), while `recipe.method` selects standard caption training or DreamBooth prior preservation.
 
 ## License
 
