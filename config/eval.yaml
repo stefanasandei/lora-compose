@@ -2,7 +2,9 @@ defaults:
   - base
   - _self_
 
+# Two is sufficient for pipeline smoke tests. Use at least 8 for reported runs.
 num_seeds: 2
-lora_path: /home/stefan/Documents/lora-composition/outputs/jerry_oftv2_b32/epoch_200
-lora_name: jerry_oftv2_b32
+num_bootstrap: 5000
+lora_path: /home/stefan/Documents/lora-composition/outputs/jerry_oftv2_b140/epoch_200
+lora_name: jerry_oftv2_b140
 character: jerry

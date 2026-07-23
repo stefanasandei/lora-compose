@@ -6,11 +6,13 @@ work in progress
 
 Initially, we train single subject adapters to compare individual-concept methods. Unless specified, we use rank = 32, alpha = 32 and 2400 training steps for all.
 
-| Method     | DINO $\uparrow$ | CLIP Score $\uparrow$ | LPIPS $\downarrow$ | ArcFace $\uparrow$ | PRES $\downarrow$ |
-| ---------- | --------------- | --------------------- | ------------------ | ------------------ | ----------------- |
-| LoRA       | 0.792           | 0.320                 | 0.435              | 0.374              | 0.210             |
-| Dreambooth | 0.809           | 0.317                 | 0.431              | 0.263              | 0.120             |
-| OFTv2      | 0.802           | 0.322                 | 0.436              | 0.331              | 0.207             |
+| Method          | Identity $\uparrow$ | Prompt $\uparrow$ | Leakage $\downarrow$ | Preservation $\uparrow$ | Balanced $\uparrow$ |
+| --------------- | ------------------- | ----------------- | -------------------- | ----------------------- | ------------------- |
+| LoRA            | 0.402               | 0.359             | 0.217                | 0.792                   | 0.597               |
+| DreamBooth-LoRA | 0.309               | 0.361             | 0.147                | 0.809                   | 0.531               |
+| OFTv2           | 0.505               | 0.357             | 0.351                | 0.737                   | 0.615               |
+
+Identity and leakage use ArcFace similarity to the trained subject on target and other-identity prompts, respectively. Prompt is CLIP alignment and preservation is paired DINO similarity to the frozen model on non-target prompts. The balanced score is the equal-weight harmonic mean of identity, `1 - leakage`, and preservation. Detailed per-sample results and prompt-bootstrapped confidence intervals are saved by the evaluation script.
 
 ## Usage
 
