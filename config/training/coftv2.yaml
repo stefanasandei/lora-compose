@@ -15,7 +15,7 @@ adapter:
   target_modules: ".*\\.(to_k|to_q|to_v|to_out\\.0)"
   dropout: 0.0
   bias: none
-  eps: 6.0e-5
+  eps: 1.0e-1
   num_cayley_neumann_terms: 5
 
 train:
