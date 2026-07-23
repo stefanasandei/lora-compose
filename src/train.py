@@ -9,7 +9,7 @@ from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from adapters import apply_adapter
+from adapters import apply_adapter, create_optimizer, finalize_adapter
 from recipes import collate_fn, compute_loss, prepare_dataset
 from sana import get_sana_pipeline, offload_frozen_components, sampling_components
 from sampling import sample_prompts
@@ -56,6 +56,22 @@ def flow_matching_prediction(
     return pred, target
 
 
+def batch_loss(transformer, batch, scheduler, cfg):
+    device = transformer.device
+    dtype = transformer.dtype
+    pred, target = flow_matching_prediction(
+        transformer,
+        scheduler["timesteps"],
+        scheduler["sigmas"],
+        scheduler["num_train_timesteps"],
+        batch["latent"].to(device, dtype=dtype),
+        batch["prompt_embeds"].to(device, dtype=dtype),
+        batch["attention_mask"].to(device),
+        transformer.config.timestep_scale,
+    )
+    return compute_loss(pred, target, cfg)
+
+
 def run_training(cfg: DictConfig) -> None:
     # 1. setup state
     set_seed(cfg.train.seed)
@@ -78,9 +94,11 @@ def run_training(cfg: DictConfig) -> None:
         subfolder="scheduler",
         cache_dir=cfg.cache_dir,
     )
-    noise_scheduler_timesteps = noise_scheduler.timesteps.to(pipe.transformer.device)
-    noise_scheduler_sigmas = noise_scheduler.sigmas.to(pipe.transformer.device)
-    num_train_timesteps = noise_scheduler.config.num_train_timesteps
+    scheduler = {
+        "timesteps": noise_scheduler.timesteps.to(pipe.transformer.device),
+        "sigmas": noise_scheduler.sigmas.to(pipe.transformer.device),
+        "num_train_timesteps": noise_scheduler.config.num_train_timesteps,
+    }
 
     dataset, num_images = prepare_dataset(pipe, cfg, character_dir)
     log.info(f"Found {num_images} training images")
@@ -91,17 +109,16 @@ def run_training(cfg: DictConfig) -> None:
     # 2. setup adapter for training
     if cfg.train.get("gradient_checkpointing", False):
         pipe.transformer.enable_gradient_checkpointing()
-    pipe.transformer = apply_adapter(pipe.transformer, cfg.adapter)
+    pipe.transformer = apply_adapter(
+        pipe.transformer,
+        cfg.adapter,
+        dataloader=dataloader,
+        loss_fn=lambda model, batch: batch_loss(model, batch, scheduler, cfg),
+    )
     pipe.transformer.train()
 
-    trainable_params = list(filter(lambda p: p.requires_grad, pipe.transformer.parameters()))
-    optimizer = torch.optim.AdamW(
-        trainable_params, lr=cfg.train.lr, weight_decay=cfg.train.weight_decay
-    )
+    optimizer = create_optimizer(pipe.transformer, cfg.adapter, cfg.train)
 
-    device = pipe.transformer.device
-    dtype = pipe.transformer.dtype
-    timestep_scale = pipe.transformer.config.timestep_scale
     max_grad_norm = cfg.train.get("max_grad_norm", 1.0)
 
     # 3. actual training
@@ -109,21 +126,7 @@ def run_training(cfg: DictConfig) -> None:
         epoch_loss = 0.0
 
         for batch in tqdm(dataloader, desc=f"Epoch {epoch}/{cfg.train.epochs}"):
-            latents = batch["latent"].to(device, dtype=dtype)
-            prompt_embeds = batch["prompt_embeds"].to(device, dtype=dtype)
-            attention_mask = batch["attention_mask"].to(device)
-
-            pred, target = flow_matching_prediction(
-                pipe.transformer,
-                noise_scheduler_timesteps,
-                noise_scheduler_sigmas,
-                num_train_timesteps,
-                latents,
-                prompt_embeds,
-                attention_mask,
-                timestep_scale,
-            )
-            loss = compute_loss(pred, target, cfg)
+            loss = batch_loss(pipe.transformer, batch, scheduler, cfg)
 
             loss.backward()
             torch.nn.utils.clip_grad_norm_(pipe.transformer.parameters(), max_grad_norm)
@@ -157,6 +160,7 @@ def run_training(cfg: DictConfig) -> None:
 
     # 4. after training, save adapter and do final samples
     pipe.transformer.eval()
+    finalize_adapter(pipe.transformer, cfg.adapter)
 
     adapter_path = os.path.join(output_dir, f"epoch_{cfg.train.epochs}")
     pipe.transformer.save_pretrained(adapter_path)
