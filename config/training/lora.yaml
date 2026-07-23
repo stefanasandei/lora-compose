@@ -1,8 +1,13 @@
+# @package _global_
+
 defaults:
-  - base
+  - /base
   - _self_
 
 character: jerry
+
+recipe:
+  method: standard
 
 adapter:
   method: lora
@@ -13,8 +18,9 @@ adapter:
   bias: none
 
 train:
-  epochs: 300
+  epochs: 200
   lr: 1.0e-4
+  weight_decay: 1.0e-4
   batch_size: 1
   seed: 42
   max_grad_norm: 1.0

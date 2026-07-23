@@ -1,126 +1,123 @@
+import hashlib
 import logging
 import os
 
-from diffusers import SanaPipeline
-from torch.utils.data import Dataset
 import torch
-
+from diffusers import SanaPipeline
 from PIL import Image
+from torch.nn.utils.rnn import pad_sequence
+from torch.utils.data import Dataset
 from tqdm import tqdm
+
 
 log = logging.getLogger(__name__)
 
 
-def list_dataset_pairs(character_dir: str) -> list[dict]:
-    if not os.path.isdir(character_dir):
-        raise FileNotFoundError(f"Character dataset not found: {character_dir}")
+def list_dataset_pairs(image_dir: str, prompt: str | None = None) -> list[dict]:
+    if not os.path.isdir(image_dir):
+        raise FileNotFoundError(f"Image dataset not found: {image_dir}")
 
     pairs = []
-    for fname in sorted(os.listdir(character_dir)):
-        if not fname.lower().endswith(".png"):
+    for filename in sorted(os.listdir(image_dir)):
+        if not filename.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
             continue
 
-        basename = os.path.splitext(fname)[0]
-        image_path = os.path.join(character_dir, fname)
-        caption_path = os.path.join(character_dir, f"{basename}.txt")
-
-        if not os.path.exists(caption_path):
+        basename = os.path.splitext(filename)[0]
+        image_path = os.path.join(image_dir, filename)
+        caption_path = os.path.join(image_dir, f"{basename}.txt")
+        if prompt is None and not os.path.exists(caption_path):
             log.warning(f"Missing caption for {image_path}, skipping.")
             continue
 
-        with open(caption_path, encoding="utf-8") as f:
-            caption = f.read().strip()
+        caption = prompt
+        if caption is None:
+            with open(caption_path, encoding="utf-8") as file:
+                caption = file.read().strip()
 
-        pairs.append({
-            "basename": basename,
-            "image_path": image_path,
-            "caption_path": caption_path,
-            "caption": caption,
-        })
+        pairs.append({"basename": basename, "image_path": image_path, "prompt": caption})
 
     return pairs
 
 
-@torch.no_grad()
-def cache_text_embeddings(pipe, pairs: list[dict], cache_path: str):
+def load_or_create_cache(cache_path, create):
     if os.path.exists(cache_path):
-        log.info(f"Text embeddings cache found at {cache_path}")
-        return
+        log.info(f"Cache found at {cache_path}")
+        return torch.load(cache_path, map_location="cpu", weights_only=True)
 
-    pipe.text_encoder.eval()
-    embeds = {}
-    for item in tqdm(pairs, desc="Caching text embeddings"):
-        prompt_embeds, prompt_attention_mask, _, _ = pipe.encode_prompt(
-            item["caption"],
-            do_classifier_free_guidance=False,
-            max_sequence_length=4096,
-        )
-        embeds[item["basename"]] = {
-            "prompt_embeds": prompt_embeds.cpu(),
-            "attention_mask": prompt_attention_mask.cpu(),
-        }
-
-    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
-    torch.save(embeds, cache_path)
-    log.info(f"Saved text embeddings to {cache_path}")
+    cache = create()
+    torch.save(cache, cache_path)
+    log.info(f"Saved cache to {cache_path}")
+    return cache
 
 
 @torch.no_grad()
-def cache_vae_latents(pipe: SanaPipeline, pairs: list[dict], cache_path: str):
-    if os.path.exists(cache_path):
-        log.info(f"VAE latents cache found at {cache_path}")
-        return
-
+def encode_image(pipe: SanaPipeline, image: Image.Image) -> torch.Tensor:
     vae = pipe.vae
-    vae.eval()
-    orig_dtype = vae.dtype
+    dtype = vae.dtype
     vae.to(torch.float32)
 
     vae_scale = pipe.vae_scale_factor
     target = pipe.transformer.config.sample_size * vae_scale
+    width, height = image.size
+    scale = target / max(width, height)
+    width = max(round(width * scale / vae_scale) * vae_scale, vae_scale)
+    height = max(round(height * scale / vae_scale) * vae_scale, vae_scale)
+    image_tensor = pipe.image_processor.preprocess(image, height=height, width=width)
+    image_tensor = image_tensor.to(device=vae.device, dtype=torch.float32)
 
-    latents = {}
-    for item in tqdm(pairs, desc="Caching VAE latents"):
-        image = Image.open(item["image_path"]).convert("RGB")
-        w, h = image.size
-        scale = target / max(w, h)
-        new_w = max(round(w * scale / vae_scale) * vae_scale, vae_scale)
-        new_h = max(round(h * scale / vae_scale) * vae_scale, vae_scale)
-        image_tensor = pipe.image_processor.preprocess(image, height=new_h, width=new_w)
-        image_tensor = image_tensor.to(device=vae.device, dtype=torch.float32)
-
-        latent = vae.encode(image_tensor).latent
-        latent = latent * vae.config.scaling_factor
-
-        latents[item["basename"]] = latent.cpu()
-
-    vae.to(orig_dtype)
-    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
-    torch.save(latents, cache_path)
-    log.info(f"Saved VAE latents to {cache_path}")
+    latent = vae.encode(image_tensor).latent * vae.config.scaling_factor
+    vae.to(dtype)
+    return latent.cpu()
 
 
-def collate_fn(batch: list[dict]) -> dict:
-    return {
-        "latent": torch.cat([b["latent"] for b in batch], dim=0),
-        "prompt_embeds": torch.cat([b["prompt_embeds"] for b in batch], dim=0),
-        "attention_mask": torch.cat([b["attention_mask"] for b in batch], dim=0),
-    }
+@torch.no_grad()
+def _encode_examples(pipe, pairs, max_sequence_length):
+    pipe.text_encoder.eval()
+    pipe.vae.eval()
+    examples = {}
 
-class CachedSanaDataset(Dataset):
-    def __init__(self, pairs: list[dict], text_cache_path: str, vae_cache_path: str):
-        self.pairs = pairs
-        self.text_embeds = torch.load(text_cache_path, map_location="cpu", weights_only=True)
-        self.vae_latents = torch.load(vae_cache_path, map_location="cpu", weights_only=True)
-
-    def __getitem__(self, idx):
-        item = self.pairs[idx]
-        basename = item["basename"]
-        return {
-            "latent": self.vae_latents[basename],
-            "prompt_embeds": self.text_embeds[basename]["prompt_embeds"],
-            "attention_mask": self.text_embeds[basename]["attention_mask"],
+    for pair in tqdm(pairs, desc="Caching training data"):
+        prompt_embeds, attention_mask, _, _ = pipe.encode_prompt(
+            pair["prompt"],
+            do_classifier_free_guidance=False,
+            max_sequence_length=max_sequence_length,
+        )
+        with Image.open(pair["image_path"]) as image:
+            latent = encode_image(pipe, image.convert("RGB"))
+        examples[pair["basename"]] = {
+            "latent": latent,
+            "prompt_embeds": prompt_embeds.cpu(),
+            "attention_mask": attention_mask.cpu(),
         }
+
+    return examples
+
+
+class CachedDataset(Dataset):
+    def __init__(self, pairs, examples):
+        self.pairs = pairs
+        self.examples = examples
+
+    def __getitem__(self, index):
+        return self.examples[self.pairs[index]["basename"]]
 
     def __len__(self):
         return len(self.pairs)
+
+
+def build_cached_dataset(pipe, pairs, cache_dir, prefix, max_sequence_length):
+    prompts = "\n".join(pair["prompt"] for pair in pairs)
+    cache_hash = hashlib.sha256(prompts.encode()).hexdigest()[:8]
+    cache_path = os.path.join(cache_dir, f"{prefix}_{cache_hash}_cache.pth")
+    examples = load_or_create_cache(
+        cache_path, lambda: _encode_examples(pipe, pairs, max_sequence_length)
+    )
+    return CachedDataset(pairs, examples)
+
+
+def collate_fn(batch):
+    return {
+        "latent": torch.cat([item["latent"] for item in batch]),
+        "prompt_embeds": pad_sequence([item["prompt_embeds"].squeeze(0) for item in batch], batch_first=True),
+        "attention_mask": pad_sequence([item["attention_mask"].squeeze(0) for item in batch], batch_first=True),
+    }

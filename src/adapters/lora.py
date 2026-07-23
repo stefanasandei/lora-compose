@@ -1,6 +1,7 @@
 from peft import LoraConfig
 
-def apply_lora(transformer, cfg_lora):
+
+def create_config(cfg_lora):
     target_modules = cfg_lora["target_modules"]
 
     config = LoraConfig(

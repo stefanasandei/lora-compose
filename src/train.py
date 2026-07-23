@@ -1,19 +1,17 @@
 import logging
 import os
-import random
 
 import hydra
 import torch
-import torch.nn.functional as F
 import wandb
 from diffusers import FlowMatchEulerDiscreteScheduler
 from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from data import CachedSanaDataset, cache_text_embeddings, cache_vae_latents, list_dataset_pairs, collate_fn
 from adapters import apply_adapter
-from sana import get_sana_pipeline
+from recipes import collate_fn, compute_loss, prepare_dataset
+from sana import get_sana_pipeline, offload_frozen_components, sampling_components
 from sampling import sample_prompts
 from utils import set_seed
 
@@ -21,7 +19,7 @@ from utils import set_seed
 log = logging.getLogger(__name__)
 
 
-def compute_flow_matching_loss(
+def flow_matching_prediction(
     transformer,
     scheduler_timesteps: torch.Tensor,
     scheduler_sigmas: torch.Tensor,
@@ -30,7 +28,7 @@ def compute_flow_matching_loss(
     prompt_embeds: torch.Tensor,
     attention_mask: torch.Tensor,
     timestep_scale: float,
-) -> torch.Tensor:
+) -> tuple[torch.Tensor, torch.Tensor]:
     batch_size = latents.size(0)
     noise = torch.randn_like(latents)
 
@@ -55,14 +53,14 @@ def compute_flow_matching_loss(
     if pred.shape[1] == 2 * target.shape[1]:
         pred = pred.chunk(2, dim=1)[0]
 
-    return F.mse_loss(pred, target, reduction="mean")
+    return pred, target
 
 
 def run_training(cfg: DictConfig) -> None:
     # 1. setup state
     set_seed(cfg.train.seed)
 
-    run_name = f"{cfg.character}_{cfg.adapter.method}_{os.urandom(3).hex()}"
+    run_name = f"{cfg.character}_{cfg.recipe.method}_{cfg.adapter.method}_{os.urandom(3).hex()}"
     wandb.init(project="lora-composition", name=run_name, config=OmegaConf.to_container(cfg, resolve=True))
 
     character_dir = os.path.join(cfg.dataset_dir, cfg.character)
@@ -72,17 +70,11 @@ def run_training(cfg: DictConfig) -> None:
     log.info(f"Character: {cfg.character}")
     log.info(f"Output dir: {output_dir}")
 
-    pairs = list_dataset_pairs(character_dir)
-    log.info(f"Found {len(pairs)} image/caption pairs")
-
-    text_cache = os.path.join(character_dir, "text_embeddings.pth")
-    vae_cache = os.path.join(character_dir, "vae_latents.pth")
-
     pipe = get_sana_pipeline(model_name_or_path=cfg.model_name_or_path, cache_dir=cfg.cache_dir)
     log.info("Pipeline loaded")
 
     noise_scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(
-        "Efficient-Large-Model/SANA_600M_1024px_diffusers",
+        cfg.model_name_or_path,
         subfolder="scheduler",
         cache_dir=cfg.cache_dir,
     )
@@ -90,18 +82,22 @@ def run_training(cfg: DictConfig) -> None:
     noise_scheduler_sigmas = noise_scheduler.sigmas.to(pipe.transformer.device)
     num_train_timesteps = noise_scheduler.config.num_train_timesteps
 
-    cache_text_embeddings(pipe, pairs, text_cache)
-    cache_vae_latents(pipe, pairs, vae_cache)
-
-    dataset = CachedSanaDataset(pairs, text_cache, vae_cache)
-    dataloader = DataLoader(dataset, batch_size=cfg.train.batch_size, shuffle=True, collate_fn=collate_fn)
+    dataset, num_images = prepare_dataset(pipe, cfg, character_dir)
+    log.info(f"Found {num_images} training images")
+    dataloader = DataLoader(dataset, batch_size=cfg.train.batch_size, shuffle=True, collate_fn=collate_fn(cfg))
+    offload_frozen_components(pipe)
+    log.info("Offloaded frozen text encoder and VAE to CPU")
 
     # 2. setup adapter for training
+    if cfg.train.get("gradient_checkpointing", False):
+        pipe.transformer.enable_gradient_checkpointing()
     pipe.transformer = apply_adapter(pipe.transformer, cfg.adapter)
     pipe.transformer.train()
 
     trainable_params = list(filter(lambda p: p.requires_grad, pipe.transformer.parameters()))
-    optimizer = torch.optim.AdamW(trainable_params, lr=cfg.train.lr)
+    optimizer = torch.optim.AdamW(
+        trainable_params, lr=cfg.train.lr, weight_decay=cfg.train.weight_decay
+    )
 
     device = pipe.transformer.device
     dtype = pipe.transformer.dtype
@@ -117,7 +113,7 @@ def run_training(cfg: DictConfig) -> None:
             prompt_embeds = batch["prompt_embeds"].to(device, dtype=dtype)
             attention_mask = batch["attention_mask"].to(device)
 
-            loss = compute_flow_matching_loss(
+            pred, target = flow_matching_prediction(
                 pipe.transformer,
                 noise_scheduler_timesteps,
                 noise_scheduler_sigmas,
@@ -127,11 +123,12 @@ def run_training(cfg: DictConfig) -> None:
                 attention_mask,
                 timestep_scale,
             )
+            loss = compute_loss(pred, target, cfg)
 
             loss.backward()
             torch.nn.utils.clip_grad_norm_(pipe.transformer.parameters(), max_grad_norm)
             optimizer.step()
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
 
             epoch_loss += loss.item()
             wandb.log({"loss": loss.item()})
@@ -140,19 +137,20 @@ def run_training(cfg: DictConfig) -> None:
         avg_loss = epoch_loss / len(dataloader)
         log.info(f"Epoch {epoch} average loss: {avg_loss:.4f}")
 
-        if epoch % 50 == 0:
+        if epoch % cfg.train.get("sample_every_epochs", 50) == 0:
             pipe.transformer.eval()
 
-            images = sample_prompts(
-                pipe, cfg.sample_prompts, output_dir=None,
-                seed=cfg.train.seed,
-                num_inference_steps=20, height=1024, width=1024, guidance_scale=3.8,
-            )
+            with sampling_components(pipe):
+                images = sample_prompts(
+                    pipe, cfg.sample_prompts, output_dir=None,
+                    seed=cfg.train.seed,
+                    num_inference_steps=20, height=1024, width=1024, guidance_scale=3.8,
+                )
             samples = [
                 wandb.Image(img, caption=f"epoch {epoch}: {prompt[:60]}")
                 for img, prompt in zip(images, cfg.sample_prompts)
             ]
-            wandb.log({"samples": samples, "epoch": epoch}, step=epoch)
+            wandb.log({"samples": samples, "epoch": epoch})
             
             pipe.transformer.train()
             torch.cuda.empty_cache()
@@ -166,12 +164,13 @@ def run_training(cfg: DictConfig) -> None:
 
     log.info("Training complete. Sampling...")
     sample_dir = os.path.join(output_dir, "samples")
-    sample_prompts(pipe, cfg.sample_prompts, sample_dir, seed=cfg.train.seed)
+    with sampling_components(pipe):
+        sample_prompts(pipe, cfg.sample_prompts, sample_dir, seed=cfg.train.seed)
 
     wandb.finish()
 
 
-@hydra.main(version_base=None, config_path="../config", config_name="train")
+@hydra.main(version_base=None, config_path="../config", config_name="training/lora")
 def main(cfg: DictConfig) -> None:
     run_training(cfg)
 

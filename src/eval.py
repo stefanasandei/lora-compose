@@ -23,22 +23,28 @@ from sampling import sample_prompts
 log = logging.getLogger(__name__)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-def compute_dino_similarity(ref_dir, output_dir, prompts, num_seeds, indices=None):
+def get_dino_model():
     processor = AutoImageProcessor.from_pretrained("facebook/dinov2-base")
     model = Dinov2Model.from_pretrained("facebook/dinov2-base").to(device).eval()
+    return processor, model
+
+def get_dino_embeddings(images, processor, model):
+    inputs = processor(images, return_tensors="pt").to(device)
+    with torch.no_grad():
+        embeds = model(**inputs).pooler_output
+    return F.normalize(embeds, dim=-1)
+
+def compute_dino_similarity(ref_dir, output_dir, prompts, num_seeds, indices=None):
+    processor, model = get_dino_model()
 
     similarities = []
-    indices = indices or range(len(prompts))
+    indices = range(len(prompts)) if indices is None else indices
     for i in indices:
         for seed in range(num_seeds):
             ref = Image.open(f"{ref_dir}/{i:02}_{seed}.png").convert("RGB")
             out = Image.open(f"{output_dir}/{i:02}_{seed}.png").convert("RGB")
-            inputs = processor([ref, out], return_tensors="pt").to(device)
-
-            with torch.no_grad():
-                embeds = model(**inputs).pooler_output
-            
-            sim = F.cosine_similarity(embeds[0:1], embeds[1:2]).item()
+            embeds = get_dino_embeddings([ref, out], processor, model)
+            sim = torch.dot(embeds[0], embeds[1]).item()
             similarities.append(sim)
    
     return [sum(similarities) / len(similarities)]
@@ -48,7 +54,7 @@ def compute_clip_score(output_dir, prompts, num_seeds, indices=None):
     model = CLIPModel.from_pretrained("openai/clip-vit-base-patch16").to(device).eval()
 
     scores = []
-    indices = indices or range(len(prompts))
+    indices = range(len(prompts)) if indices is None else indices
     for i in indices:
         prompt_text = prompts[i]["prompt"]
         for seed in range(num_seeds):
@@ -67,7 +73,7 @@ def compute_lpips(ref_dir, output_dir, prompts, num_seeds, indices=None):
     lpips = LearnedPerceptualImagePatchSimilarity(net_type='alex').to(device).eval()
 
     distances = []
-    indices = indices or range(len(prompts))
+    indices = range(len(prompts)) if indices is None else indices
     for i in indices:
         for seed in range(num_seeds):
             ref = Image.open(f"{ref_dir}/{i:02}_{seed}.png").convert("RGB")
@@ -81,38 +87,70 @@ def compute_lpips(ref_dir, output_dir, prompts, num_seeds, indices=None):
 
     return [sum(distances) / len(distances)]
 
-def compute_arcface_similarity(character_dir, output_dir, prompts, num_seeds, indices=None):
+def get_arcface_app():
     from insightface.app import FaceAnalysis
+
     app = FaceAnalysis(name='buffalo_l', root='/mnt/sda3/Documents/Models')
     app.prepare(ctx_id=0, det_size=(640, 640))
+    return app
 
-    real_embeds = []
-    for fname in sorted(os.listdir(character_dir)):
-        if not fname.endswith(".png"):
+
+def face_embedding(app, image_path):
+    img = np.array(Image.open(image_path).convert("RGB"))[:, :, ::-1]
+    faces = app.get(img)
+    if not faces:
+        print(f"Warning: no face detected in {image_path}")
+        return None
+    return faces[0].embedding
+
+
+def character_embedding(app, character_dir):
+    embeddings = []
+    for filename in sorted(os.listdir(character_dir)):
+        if not filename.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
             continue
-        img = np.array(Image.open(os.path.join(character_dir, fname)).convert("RGB"))[:, :, ::-1]
-        faces = app.get(img)
-        if len(faces) > 0:
-            real_embeds.append(faces[0].embedding)
-    if not real_embeds:
+        embedding = face_embedding(app, os.path.join(character_dir, filename))
+        if embedding is not None:
+            embeddings.append(embedding / np.linalg.norm(embedding))
+    if not embeddings:
+        return None
+    mean_embedding = np.mean(embeddings, axis=0)
+    return mean_embedding / np.linalg.norm(mean_embedding)
+
+
+def compute_arcface_similarity(character_dir, output_dir, prompts, num_seeds, indices=None):
+    app = get_arcface_app()
+    reference_embedding = character_embedding(app, character_dir)
+    if reference_embedding is None:
         return [0.0]
-    mean_embed = np.mean(real_embeds, axis=0)
 
     similarities = []
-    indices = indices or range(len(prompts))
+    indices = range(len(prompts)) if indices is None else indices
     for i in indices:
         for seed in range(num_seeds):
-            img = np.array(Image.open(f"{output_dir}/{i:02}_{seed}.png").convert("RGB"))[:, :, ::-1]
-            faces = app.get(img)
-            if len(faces) == 0:
+            embedding = face_embedding(app, f"{output_dir}/{i:02}_{seed}.png")
+            if embedding is None:
                 continue
-            emb = faces[0].embedding
-            sim = np.dot(emb, mean_embed) / (np.linalg.norm(emb) * np.linalg.norm(mean_embed))
-            similarities.append(sim)
+            similarities.append(np.dot(embedding / np.linalg.norm(embedding), reference_embedding))
 
     if not similarities:
         return [0.0]
     return [sum(similarities) / len(similarities)]
+
+
+def compute_prior_preservation(character_dir, output_dir, num_seeds, indices):
+    app = get_arcface_app()
+    reference_embedding = character_embedding(app, character_dir)
+    if reference_embedding is None:
+        return [0.0]
+
+    similarities = []
+    for i in indices:
+        for seed in range(num_seeds):
+            embedding = face_embedding(app, f"{output_dir}/{i:02}_{seed}.png")
+            if embedding is not None:
+                similarities.append(np.dot(embedding / np.linalg.norm(embedding), reference_embedding))
+    return [sum(similarities) / len(similarities)] if similarities else [0.0]
 
 def gen_reference_dataset(pipe: SanaPipeline, prompts: list[dict], ref_dir: str, num_seeds: int):
     sample_prompts(
@@ -169,7 +207,9 @@ def run_eval(cfg: DictConfig) -> None:
         if character_indices:
             metrics["ArcFace"] = compute_arcface_similarity(character_dir, output_dir, prompts, cfg.num_seeds, character_indices)
         if other_character_indices:
-            metrics["PRES"] = compute_arcface_similarity(character_dir, output_dir, prompts, cfg.num_seeds, other_character_indices)
+            metrics["PRES"] = compute_prior_preservation(
+                character_dir, output_dir, cfg.num_seeds, other_character_indices
+            )
 
     log.info(f"Evaluation done.\n{'-'*10}")
     metrics = pd.DataFrame(metrics)
