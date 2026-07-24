@@ -11,17 +11,10 @@ recipe:
 
 adapter:
   method: lokr
-  # The previous rank 128 run underfit identity. Rank 256 doubles both the
-  # learned capacity and effective update rank while retaining LoKr's compact
-  # Kronecker structure.
   r: 256
   alpha: 256
   decompose_factor: 4
   decompose_both: false
-  # Both supported initializations start at an exact zero delta, but the
-  # LyCORIS variant zeros the final high-dimensional factor. This lets the
-  # expressive branch receive gradients immediately; PEFT's plain `true`
-  # initialization initially trains only the small 4x4 Kronecker factor.
   init_weights: lycoris
   target_modules: ".*\\.(to_k|to_q|to_v|to_out\\.0)"
   rank_dropout: 0.0

@@ -4,6 +4,6 @@ defaults:
 
 num_seeds: 2
 num_bootstrap: 5000
-lora_path: /home/stefan/Documents/lora-composition/outputs/jerry_loha_r32/epoch_200
-lora_name: jerry_loha_r32
+lora_path: /home/stefan/Documents/lora-composition/outputs/jerry_lokr_r256/epoch_200
+lora_name: jerry_lokr_r256
 character: jerry
