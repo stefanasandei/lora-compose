@@ -23,10 +23,10 @@ Identity and leakage use ArcFace similarity to the trained subject on target and
 
 Additional training runs:
 
-| Method             | Identity $\uparrow$ | Prompt $\uparrow$ | Leakage $\downarrow$ | Preservation $\uparrow$ | Balanced $\uparrow$ |
-| ------------------ | ------------------- | ----------------- | -------------------- | ----------------------- | ------------------- |
-| OFTv2 (epochs=50)  | 0.433               | 0.368             | 0.242                | 0.782                   | 0.611               |
-| OFTv2 (epochs=100) | 0.490               | 0.365             | 0.277                | 0.759                   | 0.633               |
+| Method                    | Identity $\uparrow$ | Prompt $\uparrow$ | Leakage $\downarrow$ | Preservation $\uparrow$ | Balanced $\uparrow$ |
+| ------------------------- | ------------------- | ----------------- | -------------------- | ----------------------- | ------------------- |
+| OFTv2 (epochs=100, b=80)  | 0.433               | 0.368             | 0.242                | 0.782                   | 0.611               |
+| OFTv2 (epochs=100, b=140) | 0.490               | 0.365             | 0.277                | 0.759                   | 0.633               |
 
 ## Usage
 
