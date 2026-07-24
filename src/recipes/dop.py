@@ -63,6 +63,10 @@ def batch_loss(transformer, batch, scheduler, cfg):
         transformer, inputs, batch["prompt_embeds"], batch["attention_mask"]
     )
     instance_loss = compute_loss(instance_pred, inputs.target, cfg)
+    # Backward each term right after its forward pass. Gradients accumulate, so
+    # this equals one backward on the summed loss, but only one autograd graph
+    # is alive at a time: peak activation memory matches the standard recipe.
+    instance_loss.backward()
 
     with torch.no_grad(), transformer.disable_adapter():
         prior_pred = predict(
@@ -80,7 +84,9 @@ def batch_loss(transformer, batch, scheduler, cfg):
     preservation_loss = F.mse_loss(
         preservation_pred.float(), prior_pred.float(), reduction="mean"
     )
-    return instance_loss + cfg.recipe.preservation_loss_weight * preservation_loss
+    weighted_preservation_loss = cfg.recipe.preservation_loss_weight * preservation_loss
+    weighted_preservation_loss.backward()
+    return instance_loss.detach() + weighted_preservation_loss.detach()
 
 
 def collate(batch):

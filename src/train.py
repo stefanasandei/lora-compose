@@ -82,7 +82,11 @@ def run_training(cfg: DictConfig) -> None:
 
         for batch in tqdm(dataloader, desc=f"Epoch {epoch}/{cfg.train.epochs}"):
             loss = batch_loss(pipe.transformer, batch, scheduler, cfg)
-            loss.backward()
+            # Some recipes (e.g. DOP) backpropagate each loss term internally
+            # to keep only one autograd graph in memory; they return a
+            # detached total for logging.
+            if loss.requires_grad:
+                loss.backward()
             torch.nn.utils.clip_grad_norm_(pipe.transformer.parameters(), max_grad_norm)
             optimizer.step()
             optimizer.zero_grad(set_to_none=True)

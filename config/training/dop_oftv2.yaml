@@ -1,0 +1,43 @@
+# @package _global_
+
+defaults:
+  - /base
+  - _self_
+
+character: jerry
+
+# DOP pins the adapter's output on class-replaced captions to the frozen model,
+# targeting OFTv2's weak spots: leakage 0.277 and preservation 0.759 (both the
+# worst in the table). Weight 2.0 because 1.0 under-regularized DOP-LoRA.
+recipe:
+  method: dop
+  trigger_word: "Jerry Seinfeld"
+  preservation_class: "a man"
+  preservation_loss_weight: 2.0
+
+adapter:
+  method: oftv2
+  block_size: 140
+  target_modules: ".*\\.(to_k|to_q|to_v|to_out\\.0)"
+  dropout: 0.05
+  bias: none
+  num_cayley_neumann_terms: 5
+
+train:
+  # 100 epochs is OFTv2's best point (balanced 0.633); 200 epochs overtrained
+  # (leakage 0.351, balanced 0.615). Establish the DOP effect there first.
+  epochs: 100
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  batch_size: 1
+  seed: 42
+  max_grad_norm: 1.0
+
+sample_prompts:
+  - "a photo of Jerry Seinfeld performing stand-up comedy on a dark stage"
+  - "a portrait of Jerry Seinfeld, high quality"
+  - "a photo of Jerry Seinfeld sitting on a couch"
+  - "a photo of a man sitting on a couch"
+  - "a photo of Jerry Seinfeld in front of the Eiffel Tower"
+
+output_dir: ./outputs/${character}_${recipe.method}_${adapter.method}_b${adapter.block_size}
