@@ -15,7 +15,12 @@ def sample_prompts(pipe, prompts, output_dir=None, seed=42, num_seeds=1, **kwarg
     images = []
     for i, prompt in enumerate(tqdm(prompts, desc="Sampling")):
         for s in range(num_seeds):
-            generator = torch.manual_seed(seed + i * num_seeds + s)
+            # Keep sampling reproducible without resetting the global RNG used
+            # by training for data shuffling, timesteps, and diffusion noise.
+            # A CPU generator preserves the pipeline's existing seed semantics.
+            generator = torch.Generator(device="cpu").manual_seed(
+                seed + i * num_seeds + s
+            )
             image = pipe(prompt=prompt, generator=generator, **kwargs).images[0]
             images.append(image)
             if output_dir is not None:

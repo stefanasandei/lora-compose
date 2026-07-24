@@ -10,13 +10,14 @@ recipe:
   method: standard
 
 adapter:
-  method: loha
-  r: 32
-  alpha: 32
-  init_weights: lycoris
+  method: hra
+  # Rank 64 gives roughly 22.9M trainable parameters for the current
+  # SANA attention targets.
+  r: 64
+  apply_gs: false
   target_modules: ".*\\.(to_k|to_q|to_v|to_out\\.0)"
-  rank_dropout: 0.05
-  module_dropout: 0.05
+  bias: none
+  init_weights: true
 
 train:
   epochs: 200

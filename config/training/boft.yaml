@@ -1,0 +1,38 @@
+# @package _global_
+
+defaults:
+  - /base
+  - _self_
+
+character: jerry
+
+recipe:
+  method: standard
+
+adapter:
+  method: boft
+  # Four factors at block size 16 give roughly 23.3M trainable parameters
+  # for the current SANA attention targets.
+  block_size: 16
+  num_butterfly_factors: 4
+  target_modules: ".*\\.(to_k|to_q|to_v|to_out\\.0)"
+  dropout: 0.0
+  bias: none
+  init_weights: true
+
+train:
+  epochs: 200
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  batch_size: 1
+  seed: 42
+  max_grad_norm: 1.0
+
+sample_prompts:
+  - "a photo of Jerry Seinfeld performing stand-up comedy on a dark stage"
+  - "a portrait of Jerry Seinfeld, high quality"
+  - "a photo of Jerry Seinfeld sitting on a couch"
+  - "a photo of a man sitting on a couch"
+  - "a photo of Jerry Seinfeld in front of the Eiffel Tower"
+
+output_dir: ./outputs/${character}_${adapter.method}_b${adapter.block_size}_f${adapter.num_butterfly_factors}

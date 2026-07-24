@@ -133,7 +133,9 @@ def evaluate_samples(
 ):
     dino_processor, dino_model = get_dino_model()
     clip_processor, clip_model = get_clip_model()
-    lpips = LearnedPerceptualImagePatchSimilarity(net_type="alex").to(device).eval()
+    lpips = LearnedPerceptualImagePatchSimilarity(
+        net_type="alex", normalize=True
+    ).to(device).eval()
     face_app = get_arcface_app()
     subject_embedding, num_subject_references = character_embedding(
         face_app, character_dir
