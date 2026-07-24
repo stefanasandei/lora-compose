@@ -17,6 +17,8 @@ def get_sana_pipeline(model_name_or_path: str, cache_dir: Optional[str] = None):
     pipe.to("cuda")
 
     pipe.text_encoder.to(torch.bfloat16)
+    pipe.text_encoder.requires_grad_(False)
+    pipe.text_encoder.eval()
     pipe.set_progress_bar_config(disable=True)
 
     return pipe

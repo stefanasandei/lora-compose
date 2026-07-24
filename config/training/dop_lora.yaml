@@ -1,0 +1,40 @@
+# @package _global_
+
+defaults:
+  - /base
+  - _self_
+
+character: jerry
+
+# DOP preserves the base model's output for the class-replaced version of each
+# caption while learning the character from the original caption.
+recipe:
+  method: dop
+  trigger_word: "Jerry Seinfeld"
+  preservation_class: "a man"
+  preservation_loss_weight: 1.0
+
+adapter:
+  method: lora
+  r: 32
+  alpha: 32
+  target_modules: ".*\\.(to_k|to_q|to_v|to_out\\.0)"
+  dropout: 0.0
+  bias: none
+
+train:
+  epochs: 200
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  batch_size: 1
+  seed: 42
+  max_grad_norm: 1.0
+
+sample_prompts:
+  - "a photo of Jerry Seinfeld performing stand-up comedy on a dark stage"
+  - "a portrait of Jerry Seinfeld, high quality"
+  - "a photo of Jerry Seinfeld sitting on a couch"
+  - "a photo of a man sitting on a couch"
+  - "a photo of Jerry Seinfeld in front of the Eiffel Tower"
+
+output_dir: ./outputs/${character}_${recipe.method}_${adapter.method}_r${adapter.r}

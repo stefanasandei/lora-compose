@@ -10,66 +10,13 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from adapters import apply_adapter, create_optimizer, finalize_adapter
-from recipes import collate_fn, compute_loss, prepare_dataset
+from recipes import batch_loss, collate_fn, prepare_dataset
 from sana import get_sana_pipeline, offload_frozen_components, sampling_components
 from sampling import sample_prompts
 from utils import set_seed
 
 
 log = logging.getLogger(__name__)
-
-
-def flow_matching_prediction(
-    transformer,
-    scheduler_timesteps: torch.Tensor,
-    scheduler_sigmas: torch.Tensor,
-    num_train_timesteps: int,
-    latents: torch.Tensor,
-    prompt_embeds: torch.Tensor,
-    attention_mask: torch.Tensor,
-    timestep_scale: float,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    batch_size = latents.size(0)
-    noise = torch.randn_like(latents)
-
-    u = torch.rand(batch_size, device=latents.device)
-    indices = (u * num_train_timesteps).long()
-    timesteps = scheduler_timesteps[indices].to(dtype=latents.dtype)
-    sigmas = scheduler_sigmas[indices].to(dtype=latents.dtype).view(batch_size, 1, 1, 1)
-
-    noisy_latents = (1.0 - sigmas) * latents + sigmas * noise
-    target = noise - latents
-
-    scaled_timesteps = timesteps * timestep_scale
-
-    pred = transformer(
-        hidden_states=noisy_latents,
-        encoder_hidden_states=prompt_embeds,
-        timestep=scaled_timesteps,
-        encoder_attention_mask=attention_mask,
-        return_dict=False,
-    )[0]
-
-    if pred.shape[1] == 2 * target.shape[1]:
-        pred = pred.chunk(2, dim=1)[0]
-
-    return pred, target
-
-
-def batch_loss(transformer, batch, scheduler, cfg):
-    device = transformer.device
-    dtype = transformer.dtype
-    pred, target = flow_matching_prediction(
-        transformer,
-        scheduler["timesteps"],
-        scheduler["sigmas"],
-        scheduler["num_train_timesteps"],
-        batch["latent"].to(device, dtype=dtype),
-        batch["prompt_embeds"].to(device, dtype=dtype),
-        batch["attention_mask"].to(device),
-        transformer.config.timestep_scale,
-    )
-    return compute_loss(pred, target, cfg)
 
 
 def save_adapter_checkpoint(transformer, output_dir, epoch):
@@ -93,6 +40,8 @@ def run_training(cfg: DictConfig) -> None:
     log.info(f"Output dir: {output_dir}")
 
     pipe = get_sana_pipeline(model_name_or_path=cfg.model_name_or_path, cache_dir=cfg.cache_dir)
+    if any(parameter.requires_grad for parameter in pipe.text_encoder.parameters()):
+        raise RuntimeError("The text encoder must remain frozen")
     log.info("Pipeline loaded")
 
     noise_scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(

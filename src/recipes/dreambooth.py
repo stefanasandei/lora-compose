@@ -8,6 +8,7 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from data import build_cached_dataset, collate_fn, encode_image, list_dataset_pairs, load_or_create_cache
+from .flow_matching import predict, prepare_inputs
 
 
 log = logging.getLogger(__name__)
@@ -131,6 +132,12 @@ def compute_loss(pred, target, cfg):
     instance_loss = F.mse_loss(instance_pred.float(), instance_target.float(), reduction="mean")
     prior_loss = F.mse_loss(prior_pred.float(), prior_target.float(), reduction="mean")
     return instance_loss + cfg.recipe.prior_loss_weight * prior_loss
+
+
+def batch_loss(transformer, batch, scheduler, cfg):
+    inputs = prepare_inputs(transformer, batch, scheduler)
+    pred = predict(transformer, inputs, batch["prompt_embeds"], batch["attention_mask"])
+    return compute_loss(pred, inputs.target, cfg)
 
 
 def collate(batch):
