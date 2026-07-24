@@ -16,8 +16,6 @@ Initially, we train single subject adapters to compare individual-concept method
 | OFTv2           | 0.505               | 0.357             | 0.351                | 0.737                   | 0.615               |
 | COFTv2          | 0.329               | 0.355             | 0.198                | 0.787                   | 0.540               |
 | PEANuT          | 0.514               | 0.348             | 0.321                | 0.747                   | 0.631               |
-| BOFT            |                     |                   |                      |                         |                     |
-| HRA             |                     |                   |                      |                         |                     |
 
 Identity and leakage use ArcFace similarity to the trained subject on target and other-identity prompts, respectively. Prompt is CLIP alignment and preservation is paired DINO similarity to the frozen model on non-target prompts. The balanced score is the equal-weight harmonic mean of identity, `1 - leakage`, and preservation. Detailed per-sample results and prompt-bootstrapped confidence intervals are saved by the evaluation script.
 
