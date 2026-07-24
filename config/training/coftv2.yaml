@@ -15,7 +15,9 @@ adapter:
   target_modules: ".*\\.(to_k|to_q|to_v|to_out\\.0)"
   dropout: 0.0
   bias: none
-  eps: 1.0e-1
+  # PEFT divides this radius by sqrt(number of blocks). At eps=0.1 all
+  # 16 blocks saturated at a Frobenius radius of only 0.025.
+  eps: 1.0
   num_cayley_neumann_terms: 5
 
 train:

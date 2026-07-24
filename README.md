@@ -12,8 +12,8 @@ Initially, we train single subject adapters to compare individual-concept method
 | DreamBooth-LoRA | 0.309               | 0.361             | 0.147                | 0.809                   | 0.531               |
 | DoRA            | 0.395               | 0.353             | 0.217                | 0.790                   | 0.591               |
 | LoHa            |                     |                   |                      |                         |                     |
-| LoKr            | 0.252               | 0.362             | 0.126                | 0.806                   | 0.472               |
-| PiSSA           |                     |                   |                      |                         |                     |
+| LoKr            | 0.316               | 0.357             | 0.154                | 0.799                   | 0.536               |
+| PiSSA           | 0.373               | 0.358             | 0.227                | 0.768                   | 0.569               |
 | OFTv2           | 0.505               | 0.357             | 0.351                | 0.737                   | 0.615               |
 | COFTv2          | 0.076               | 0.320             | 0.043                | 0.816                   | 0.195               |
 

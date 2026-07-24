@@ -12,6 +12,7 @@ def create_config(cfg_lokr):
         module_dropout=cfg_lokr.get("module_dropout", 0.0),
         decompose_both=cfg_lokr.get("decompose_both", False),
         decompose_factor=cfg_lokr.get("decompose_factor", -1),
+        init_weights=cfg_lokr.get("init_weights", "lycoris"),
     )
 
     return config

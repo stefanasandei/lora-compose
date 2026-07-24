@@ -72,6 +72,12 @@ def batch_loss(transformer, batch, scheduler, cfg):
     return compute_loss(pred, target, cfg)
 
 
+def save_adapter_checkpoint(transformer, output_dir, epoch):
+    adapter_path = os.path.join(output_dir, f"epoch_{epoch}")
+    transformer.save_pretrained(adapter_path)
+    log.info("Saved adapter checkpoint to %s", adapter_path)
+
+
 def run_training(cfg: DictConfig) -> None:
     # 1. setup state
     set_seed(cfg.train.seed)
@@ -140,6 +146,14 @@ def run_training(cfg: DictConfig) -> None:
         avg_loss = epoch_loss / len(dataloader)
         log.info(f"Epoch {epoch} average loss: {avg_loss:.4f}")
 
+        save_every_epochs = cfg.train.get("save_every_epochs")
+        if (
+            save_every_epochs
+            and epoch % save_every_epochs == 0
+            and epoch != cfg.train.epochs
+        ):
+            save_adapter_checkpoint(pipe.transformer, output_dir, epoch)
+
         if epoch % cfg.train.get("sample_every_epochs", 50) == 0:
             pipe.transformer.eval()
 
@@ -162,9 +176,7 @@ def run_training(cfg: DictConfig) -> None:
     pipe.transformer.eval()
     finalize_adapter(pipe.transformer, cfg.adapter)
 
-    adapter_path = os.path.join(output_dir, f"epoch_{cfg.train.epochs}")
-    pipe.transformer.save_pretrained(adapter_path)
-    log.info(f"Saved adapter to {adapter_path}")
+    save_adapter_checkpoint(pipe.transformer, output_dir, cfg.train.epochs)
 
     log.info("Training complete. Sampling...")
     sample_dir = os.path.join(output_dir, "samples")
