@@ -4,7 +4,7 @@ work in progress
 
 ## Experiment results
 
-Initially, we train single subject adapters to compare individual-concept methods. For the hyperparameters of each methods, please check its coresponding config file under `config/training`. 
+Initially, we train single subject adapters to compare individual-concept methods. For the hyperparameters of each methods, please check its coresponding config file under `config/training`. Each adapter has been trained for 2400 steps:
 
 | Method          | Identity $\uparrow$ | Prompt $\uparrow$ | Leakage $\downarrow$ | Preservation $\uparrow$ | Balanced $\uparrow$ |
 | --------------- | ------------------- | ----------------- | -------------------- | ----------------------- | ------------------- |
@@ -20,6 +20,13 @@ Initially, we train single subject adapters to compare individual-concept method
 | HRA             |                     |                   |                      |                         |                     |
 
 Identity and leakage use ArcFace similarity to the trained subject on target and other-identity prompts, respectively. Prompt is CLIP alignment and preservation is paired DINO similarity to the frozen model on non-target prompts. The balanced score is the equal-weight harmonic mean of identity, `1 - leakage`, and preservation. Detailed per-sample results and prompt-bootstrapped confidence intervals are saved by the evaluation script.
+
+Additional training runs:
+
+| Method             | Identity $\uparrow$ | Prompt $\uparrow$ | Leakage $\downarrow$ | Preservation $\uparrow$ | Balanced $\uparrow$ |
+| ------------------ | ------------------- | ----------------- | -------------------- | ----------------------- | ------------------- |
+| OFTv2 (epochs=50)  | 0.433               | 0.368             | 0.242                | 0.782                   | 0.611               |
+| OFTv2 (epochs=100) | 0.490               | 0.365             | 0.277                | 0.759                   | 0.633               |
 
 ## Usage
 

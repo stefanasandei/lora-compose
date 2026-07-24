@@ -13,12 +13,12 @@ adapter:
   method: oftv2
   block_size: 140
   target_modules: ".*\\.(to_k|to_q|to_v|to_out\\.0)"
-  dropout: 0.0
+  dropout: 0.05
   bias: none
   num_cayley_neumann_terms: 5
 
 train:
-  epochs: 200
+  epochs: 100
   lr: 1.0e-4
   weight_decay: 1.0e-4
   batch_size: 1
