@@ -133,7 +133,6 @@ def run_training(cfg: DictConfig) -> None:
 
         for batch in tqdm(dataloader, desc=f"Epoch {epoch}/{cfg.train.epochs}"):
             loss = batch_loss(pipe.transformer, batch, scheduler, cfg)
-
             loss.backward()
             torch.nn.utils.clip_grad_norm_(pipe.transformer.parameters(), max_grad_norm)
             optimizer.step()

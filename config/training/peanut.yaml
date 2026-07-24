@@ -10,21 +10,22 @@ recipe:
   method: standard
 
 adapter:
-  method: loha
+  method: peanut
   r: 32
-  alpha: 32
-  init_weights: lycoris
+  depth: 0
+  act_fn: relu
+  scaling: 1.0
   target_modules: ".*\\.(to_k|to_q|to_v|to_out\\.0)"
-  rank_dropout: 0.05
-  module_dropout: 0.05
+  init_weights: true
 
 train:
   epochs: 200
-  lr: 1.0e-4
+  lr: 5.0e-5
   weight_decay: 1.0e-4
   batch_size: 1
   seed: 42
   max_grad_norm: 1.0
+  gradient_checkpointing: true
 
 sample_prompts:
   - "a photo of Jerry Seinfeld performing stand-up comedy on a dark stage"
@@ -33,4 +34,4 @@ sample_prompts:
   - "a photo of a man sitting on a couch"
   - "a photo of Jerry Seinfeld in front of the Eiffel Tower"
 
-output_dir: ./outputs/${character}_${adapter.method}_r${adapter.r}
+output_dir: ./outputs/${character}_${adapter.method}_r${adapter.r}_d${adapter.depth}

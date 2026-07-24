@@ -1,7 +1,7 @@
 from peft import get_peft_model
 import torch
 
-from . import coftv2, dora, loha, lokr, lora, oftv2, pissa
+from . import coftv2, dora, loha, lokr, lora, oftv2, peanut, pissa
 
 
 methods = {
@@ -11,6 +11,7 @@ methods = {
     "lokr": lokr,
     "lora": lora,
     "oftv2": oftv2,
+    "peanut": peanut,
     "pissa": pissa,
 }
 
