@@ -10,22 +10,18 @@ recipe:
   method: standard
 
 adapter:
-  method: lokr
-  # The previous rank 128 run underfit identity. Rank 256 doubles both the
-  # learned capacity and effective update rank while retaining LoKr's compact
-  # Kronecker structure.
-  r: 256
-  alpha: 256
-  decompose_factor: 4
-  decompose_both: false
-  # Both supported initializations start at an exact zero delta, but the
-  # LyCORIS variant zeros the final high-dimensional factor. This lets the
-  # expressive branch receive gradients immediately; PEFT's plain `true`
-  # initialization initially trains only the small 4x4 Kronecker factor.
-  init_weights: lycoris
+  method: loha
+  # LoHa has two low-rank branches; rank 32 gives it substantially more
+  # update capacity than LoRA while remaining practical on a 24 GB GPU.
+  r: 32
+  alpha: 32
   target_modules: ".*\\.(to_k|to_q|to_v|to_out\\.0)"
   rank_dropout: 0.0
   module_dropout: 0.0
+  # PEFT's default zero-delta initialization preserves the frozen model at
+  # step zero. Do not use a random, non-zero adapter initialization here.
+  init_weights: true
+
 train:
   epochs: 200
   lr: 1.0e-4
@@ -33,6 +29,7 @@ train:
   batch_size: 1
   seed: 42
   max_grad_norm: 1.0
+  gradient_checkpointing: true
 
 sample_prompts:
   - "a photo of Jerry Seinfeld performing stand-up comedy on a dark stage"

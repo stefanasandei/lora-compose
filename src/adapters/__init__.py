@@ -1,12 +1,13 @@
 from peft import get_peft_model
 import torch
 
-from . import coftv2, dora, lokr, lora, oftv2, peanut, pissa
+from . import coftv2, dora, loha, lokr, lora, oftv2, peanut, pissa
 
 
 methods = {
     "coftv2": coftv2,
     "dora": dora,
+    "loha": loha,
     "lokr": lokr,
     "lora": lora,
     "oftv2": oftv2,
