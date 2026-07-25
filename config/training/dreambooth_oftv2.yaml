@@ -1,0 +1,53 @@
+# @package _global_
+
+defaults:
+  - /base
+  - _self_
+
+character: jerry
+
+# Instance images use their VLM-generated captions, which already identify
+# Jerry Seinfeld. Class images are generated in memory by the frozen base model.
+recipe:
+  method: dreambooth
+  prior_prompts:
+    - "a photo of a man"
+    - "a portrait of a man"
+    - "a man sitting on a couch"
+    - "a man standing in a kitchen"
+    - "a man performing on a dark stage"
+    - "a man in a suit"
+    - "a man at a cafe"
+    - "a man in an apartment"
+    - "a photo of Michael Smith"
+    - "a photo of Robert Johnson"
+  num_class_images: 200
+  prior_loss_weight: 2.0
+
+adapter:
+  method: oftv2
+  block_size: 140
+  target_modules: ".*\\.(to_k|to_q|to_v|to_out\\.0)"
+  dropout: 0.05
+  bias: none
+  num_cayley_neumann_terms: 5
+
+train:
+  # 200 batches/epoch (one instance + one class example), for 2400 optimizer steps.
+  epochs: 6
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  batch_size: 1
+  seed: 42
+  max_grad_norm: 1.0
+  gradient_checkpointing: true
+  sample_every_epochs: 1
+
+sample_prompts:
+  - "a photo of Jerry Seinfeld performing stand-up comedy on a dark stage"
+  - "a portrait of Jerry Seinfeld, high quality"
+  - "a photo of Jerry Seinfeld sitting on a couch"
+  - "a photo of a man sitting on a couch"
+  - "a photo of Jerry Seinfeld in front of the Eiffel Tower"
+
+output_dir: ./outputs/${character}_${recipe.method}_${adapter.method}_b${adapter.block_size}
