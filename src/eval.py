@@ -20,6 +20,13 @@ from transformers import (
     Dinov2Model,
 )
 
+from evaluation.identity import (
+    build_reference_embeddings,
+    evaluate_identity_assignments,
+    face_embedding,
+    normalize_prompts,
+)
+from evaluation.summary import headline_metrics, summarize_samples
 from sana import get_sana_pipeline
 from sampling import sample_prompts
 
@@ -66,42 +73,11 @@ def get_arcface_app():
     return app
 
 
-def face_embedding(app, image):
-    """Return the largest detected face, avoiding detector-order ambiguity."""
-    array = np.asarray(image.convert("RGB"))[:, :, ::-1]
-    faces = app.get(array)
-    if not faces:
-        return None
-    face = max(
-        faces,
-        key=lambda item: (
-            (item.bbox[2] - item.bbox[0]) * (item.bbox[3] - item.bbox[1])
-        ),
-    )
-    embedding = face.embedding
-    return embedding / np.linalg.norm(embedding)
-
-
-def character_embedding(app, character_dir):
-    embeddings = []
-    for filename in sorted(os.listdir(character_dir)):
-        if not filename.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
-            continue
-        with Image.open(os.path.join(character_dir, filename)) as image:
-            embedding = face_embedding(app, image)
-        if embedding is not None:
-            embeddings.append(embedding)
-    if not embeddings:
-        raise ValueError(f"No faces detected in subject references: {character_dir}")
-    mean_embedding = np.mean(embeddings, axis=0)
-    return mean_embedding / np.linalg.norm(mean_embedding), len(embeddings)
-
-
-def prompt_group(prompt, subject):
-    character = prompt.get("character")
-    if character == subject:
+def prompt_group(prompt, subjects):
+    prompt_subjects = prompt["subjects"]
+    if any(subject in subjects for subject in prompt_subjects):
         return "target"
-    if character:
+    if prompt_subjects:
         return "other_identity"
     return "general"
 
@@ -127,8 +103,9 @@ def evaluate_samples(
     prompts,
     output_dir,
     ref_dir,
-    character_dir,
-    subject,
+    subjects,
+    primary_subject_embedding,
+    face_app,
     num_seeds,
 ):
     dino_processor, dino_model = get_dino_model()
@@ -136,19 +113,10 @@ def evaluate_samples(
     lpips = LearnedPerceptualImagePatchSimilarity(
         net_type="alex", normalize=True
     ).to(device).eval()
-    face_app = get_arcface_app()
-    subject_embedding, num_subject_references = character_embedding(
-        face_app, character_dir
-    )
-    log.info(
-        "Built identity reference from %d detected subject faces",
-        num_subject_references,
-    )
-
     rows = []
     for prompt_index, prompt_info in enumerate(prompts):
         prompt = prompt_info["prompt"]
-        group = prompt_group(prompt_info, subject)
+        group = prompt_group(prompt_info, subjects)
         for seed in range(num_seeds):
             output_path = image_path(
                 output_dir, prompt_index, seed, num_seeds
@@ -206,127 +174,22 @@ def evaluate_samples(
                         "Face_Detected": output_face is not None,
                         "Base_Face_Detected": reference_face is not None,
                         "ArcFace_Target": (
-                            float(np.dot(output_face, subject_embedding))
+                            float(
+                                np.dot(output_face, primary_subject_embedding)
+                            )
                             if output_face is not None
                             else np.nan
                         ),
                         "Base_ArcFace_Target": (
-                            float(np.dot(reference_face, subject_embedding))
+                            float(
+                                np.dot(reference_face, primary_subject_embedding)
+                            )
                             if reference_face is not None
                             else np.nan
                         ),
                     }
                 )
 
-    return pd.DataFrame(rows)
-
-
-def clustered_interval(frame, metric, num_bootstrap=5000, seed=0):
-    """Bootstrap prompt means, not correlated images from the same prompt."""
-    prompt_means = (
-        frame.groupby("prompt_index", sort=False)[metric]
-        .mean()
-        .dropna()
-        .to_numpy()
-    )
-    if len(prompt_means) == 0:
-        return np.nan, np.nan, np.nan, 0
-    estimate = float(prompt_means.mean())
-    if len(prompt_means) == 1:
-        return estimate, np.nan, np.nan, 1
-
-    rng = np.random.default_rng(seed)
-    samples = rng.choice(
-        prompt_means,
-        size=(num_bootstrap, len(prompt_means)),
-        replace=True,
-    ).mean(axis=1)
-    lower, upper = np.quantile(samples, [0.025, 0.975])
-    return estimate, float(lower), float(upper), len(prompt_means)
-
-
-def prompt_mean(frame, metric):
-    return frame.groupby("prompt_index")[metric].mean().dropna().mean()
-
-
-def harmonic_mean(values):
-    values = np.clip(np.asarray(values, dtype=float), 1e-8, 1.0)
-    return len(values) / np.reciprocal(values).sum()
-
-
-def headline_metrics(samples):
-    target = samples[samples["group"] == "target"]
-    other_identities = samples[samples["group"] == "other_identity"]
-    non_target = samples[samples["group"] != "target"]
-
-    identity = prompt_mean(target, "ArcFace_Target")
-    prompt_adherence = prompt_mean(target, "CLIP_Score")
-    leakage = prompt_mean(other_identities, "ArcFace_Target")
-    preservation = prompt_mean(non_target, "DINO_Base_Preservation")
-    balanced = harmonic_mean((identity, 1.0 - leakage, preservation))
-
-    return pd.DataFrame(
-        [{
-            "Identity": identity,
-            "Prompt_Adherence": prompt_adherence,
-            "Concept_Leakage": leakage,
-            "Model_Preservation": preservation,
-            "Balanced_Score": balanced,
-        }]
-    )
-
-
-def summarize_samples(samples, num_bootstrap):
-    rows = []
-    metrics = (
-        "CLIP_Score",
-        "DINO_Base_Preservation",
-        "LPIPS_Base_Distance",
-        "ArcFace_Target",
-        "Base_ArcFace_Target",
-    )
-    for group, group_frame in samples.groupby("group", sort=False):
-        for metric_index, metric in enumerate(metrics):
-            mean, lower, upper, n_prompts = clustered_interval(
-                group_frame,
-                metric,
-                num_bootstrap=num_bootstrap,
-                seed=metric_index,
-            )
-            rows.append(
-                {
-                    "group": group,
-                    "metric": metric,
-                    "mean": mean,
-                    "ci95_low": lower,
-                    "ci95_high": upper,
-                    "n_prompts": n_prompts,
-                    "n_images": int(group_frame[metric].notna().sum()),
-                }
-            )
-
-        rows.extend(
-            (
-                {
-                    "group": group,
-                    "metric": "Face_Detection_Rate",
-                    "mean": float(group_frame["Face_Detected"].mean()),
-                    "ci95_low": np.nan,
-                    "ci95_high": np.nan,
-                    "n_prompts": int(group_frame["prompt_index"].nunique()),
-                    "n_images": len(group_frame),
-                },
-                {
-                    "group": group,
-                    "metric": "Base_Face_Detection_Rate",
-                    "mean": float(group_frame["Base_Face_Detected"].mean()),
-                    "ci95_low": np.nan,
-                    "ci95_high": np.nan,
-                    "n_prompts": int(group_frame["prompt_index"].nunique()),
-                    "n_images": len(group_frame),
-                },
-            )
-        )
     return pd.DataFrame(rows)
 
 
@@ -340,20 +203,54 @@ def gen_reference_dataset(pipe, prompts, ref_dir, num_seeds):
     )
 
 
+def evaluation_subjects(cfg):
+    """Resolve the optional multi-subject config with legacy compatibility."""
+
+    configured = cfg.get("characters")
+    if configured:
+        subjects = list(configured)
+    elif cfg.get("character"):
+        subjects = [cfg.character]
+    else:
+        raise ValueError("Evaluation requires `character` or `characters`")
+    if len(subjects) != len(set(subjects)):
+        raise ValueError("Evaluation subjects must be unique")
+    return subjects
+
+
+def output_cache_prefix(cfg):
+    """Key composed-adapter samples by their immutable manifest hash."""
+
+    prefix = cfg.lora_name
+    lora_path = cfg.get("lora_path")
+    if not lora_path:
+        return prefix
+    manifest_path = os.path.join(lora_path, "composition.json")
+    if not os.path.isfile(manifest_path):
+        return prefix
+    with open(manifest_path, encoding="utf-8") as file:
+        manifest = json.load(file)
+    manifest_hash = manifest.get("manifest_hash")
+    if not manifest_hash:
+        raise ValueError(f"Composition manifest has no manifest_hash: {manifest_path}")
+    return f"{prefix}_{manifest_hash[:12]}"
+
+
 def run_eval(cfg: DictConfig):
     log.info("Running evaluation.")
     with open(
         os.path.join(cfg.dataset_dir, "evals", "prompts.json"),
         encoding="utf-8",
     ) as file:
-        prompts = json.load(file)
+        prompts = normalize_prompts(json.load(file))
 
     evals_dir = os.path.join(cfg.dataset_dir, "evals")
     ref_dir = os.path.join(evals_dir, "reference")
+    cache_prefix = output_cache_prefix(cfg)
     existing = sorted(
         directory
         for directory in os.listdir(evals_dir)
-        if directory.startswith(cfg.lora_name + "_")
+        if directory.startswith(cache_prefix + "_")
         and os.path.isdir(os.path.join(evals_dir, directory))
     )
     output_dir = (
@@ -361,7 +258,7 @@ def run_eval(cfg: DictConfig):
         if existing
         else os.path.join(
             evals_dir,
-            f"{cfg.lora_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            f"{cache_prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
         )
     )
 
@@ -395,14 +292,49 @@ def run_eval(cfg: DictConfig):
         del pipe
         torch.cuda.empty_cache()
 
-    character_dir = os.path.join(cfg.dataset_dir, cfg.character)
+    subjects = evaluation_subjects(cfg)
+    subject_directories = {
+        subject: os.path.join(cfg.dataset_dir, subject)
+        for subject in subjects
+    }
+    face_app = get_arcface_app()
+    reference_embeddings, reference_counts = build_reference_embeddings(
+        face_app, subject_directories
+    )
+    for subject, count in reference_counts.items():
+        log.info(
+            "Built %s identity reference from %d detected faces",
+            subject,
+            count,
+        )
+
     samples = evaluate_samples(
         prompts,
         output_dir,
         ref_dir,
-        character_dir,
-        cfg.character,
+        subjects,
+        reference_embeddings[subjects[0]],
+        face_app,
         cfg.num_seeds,
+    )
+    identity_prompts = [
+        {
+            **prompt,
+            "subjects": [
+                subject for subject in prompt["subjects"]
+                if subject in reference_embeddings
+            ],
+        }
+        for prompt in prompts
+    ]
+    identities = evaluate_identity_assignments(
+        face_app,
+        identity_prompts,
+        output_dir,
+        cfg.num_seeds,
+        reference_embeddings,
+        image_path,
+        cfg.get("identity_threshold", 0.3),
     )
     summary = summarize_samples(
         samples, cfg.get("num_bootstrap", 5000)
@@ -410,10 +342,13 @@ def run_eval(cfg: DictConfig):
     headline = headline_metrics(samples)
 
     samples.to_csv(os.path.join(output_dir, "sample_metrics.csv"), index=False)
+    identities.to_csv(
+        os.path.join(output_dir, "identity_metrics.csv"), index=False
+    )
     summary.to_csv(os.path.join(output_dir, "metrics.csv"), index=False)
     headline.to_csv(os.path.join(output_dir, "headline_metrics.csv"), index=False)
     print(headline.to_string(index=False))
-    log.info("Saved per-image and summary metrics to %s", output_dir)
+    log.info("Saved sample, identity, and summary metrics to %s", output_dir)
 
 
 @hydra.main(version_base=None, config_path="../config", config_name="eval")

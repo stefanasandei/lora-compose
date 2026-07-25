@@ -1,0 +1,15 @@
+# @package _global_
+
+defaults:
+  - /base
+  - _self_
+
+composition:
+  method: sum
+  # Each source is a normal PEFT LoRA checkpoint:
+  # sources:
+  #   - path: ./outputs/jerry_lora_r32/epoch_200
+  #     weight: 1.0
+  sources: []
+
+output_dir: ./outputs/compositions/sum
