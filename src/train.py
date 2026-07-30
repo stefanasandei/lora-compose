@@ -29,18 +29,32 @@ def run_training(cfg: DictConfig) -> None:
     # 1. setup state
     set_seed(cfg.train.seed)
 
-    run_name = f"{cfg.character}_{cfg.recipe.method}_{cfg.adapter.method}_{os.urandom(3).hex()}"
-    wandb.init(project="lora-composition", name=run_name, config=OmegaConf.to_container(cfg, resolve=True))
+    characters = list(cfg.get("characters") or [cfg.character])
+    subject_name = "-".join(characters)
+    run_name = (
+        f"{subject_name}_{cfg.recipe.method}_{cfg.adapter.method}_"
+        f"{os.urandom(3).hex()}"
+    )
+    wandb.init(
+        project="lora-composition",
+        name=run_name,
+        config=OmegaConf.to_container(cfg, resolve=True),
+    )
 
-    character_dir = os.path.join(cfg.dataset_dir, cfg.character)
     output_dir = cfg.output_dir
     os.makedirs(output_dir, exist_ok=True)
 
-    log.info(f"Character: {cfg.character}")
+    log.info(f"Characters: {', '.join(characters)}")
     log.info(f"Output dir: {output_dir}")
 
-    pipe = get_sana_pipeline(model_name_or_path=cfg.model_name_or_path, cache_dir=cfg.cache_dir)
-    if any(parameter.requires_grad for parameter in pipe.text_encoder.parameters()):
+    pipe = get_sana_pipeline(
+        model_name_or_path=cfg.model_name_or_path,
+        cache_dir=cfg.cache_dir,
+    )
+    if any(
+        parameter.requires_grad
+        for parameter in pipe.text_encoder.parameters()
+    ):
         raise RuntimeError("The text encoder must remain frozen")
     log.info("Pipeline loaded")
 
@@ -55,9 +69,14 @@ def run_training(cfg: DictConfig) -> None:
         "num_train_timesteps": noise_scheduler.config.num_train_timesteps,
     }
 
-    dataset, num_images = prepare_dataset(pipe, cfg, character_dir)
+    dataset, num_images = prepare_dataset(pipe, cfg)
     log.info(f"Found {num_images} training images")
-    dataloader = DataLoader(dataset, batch_size=cfg.train.batch_size, shuffle=True, collate_fn=collate_fn(cfg))
+    dataloader = DataLoader(
+        dataset,
+        batch_size=cfg.train.batch_size,
+        shuffle=True,
+        collate_fn=collate_fn(cfg),
+    )
     offload_frozen_components(pipe)
     log.info("Offloaded frozen text encoder and VAE to CPU")
 

@@ -7,23 +7,11 @@ from scipy.optimize import linear_sum_assignment
 
 
 IDENTITY_COLUMNS = (
-    "prompt_id", "seed", "expected_subject", "face_index", "similarity",
-    "matched", "correct", "bbox_x1", "bbox_y1", "bbox_x2", "bbox_y2",
+    "prompt_index", "prompt_id", "prompt_type", "subject_count", "seed",
+    "expected_subject", "face_index", "similarity", "other_similarity",
+    "identity_margin", "matched", "correct", "bbox_x1", "bbox_y1",
+    "bbox_x2", "bbox_y2",
 )
-
-
-def normalize_prompts(prompts):
-    """Accept both the old ``character`` and new ``subjects`` prompt schema."""
-    result = []
-    for index, item in enumerate(prompts):
-        item = dict(item)
-        subjects = item.get("subjects")
-        if subjects is None:
-            subjects = [item["character"]] if item.get("character") else []
-        item["subjects"] = [subjects] if isinstance(subjects, str) else list(subjects)
-        item["id"] = str(item.get("id", index))
-        result.append(item)
-    return result
 
 
 def detected_faces(app, image):
@@ -71,6 +59,7 @@ def assign_identities(expected, faces, references, threshold):
     """Assign expected subjects to detected faces; missing faces score zero."""
     rows = [{
         "expected_subject": subject, "face_index": pd.NA, "similarity": 0.0,
+        "other_similarity": np.nan, "identity_margin": np.nan,
         "matched": False, "correct": False, "bbox_x1": np.nan,
         "bbox_y1": np.nan, "bbox_x2": np.nan, "bbox_y2": np.nan,
     } for subject in expected]
@@ -90,8 +79,16 @@ def assign_identities(expected, faces, references, threshold):
         predicted = max(
             reference_names, key=lambda name: np.dot(references[name], embedding)
         )
+        other_scores = [
+            np.dot(reference, embedding)
+            for name, reference in references.items()
+            if name != expected[subject_index]
+        ]
+        other_similarity = float(max(other_scores)) if other_scores else np.nan
         rows[subject_index].update({
             "face_index": detected_index, "similarity": score, "matched": True,
+            "other_similarity": other_similarity,
+            "identity_margin": score - other_similarity,
             "correct": score >= threshold and predicted == expected[subject_index],
             "bbox_x1": bbox[0], "bbox_y1": bbox[1],
             "bbox_x2": bbox[2], "bbox_y2": bbox[3],
@@ -114,5 +111,12 @@ def evaluate_identity_assignments(
             for assignment in assign_identities(
                 prompt["subjects"], faces, references, threshold
             ):
-                rows.append({"prompt_id": prompt["id"], "seed": seed, **assignment})
+                rows.append({
+                    "prompt_index": prompt_index,
+                    "prompt_id": prompt["id"],
+                    "prompt_type": prompt["type"],
+                    "subject_count": len(prompt["subjects"]),
+                    "seed": seed,
+                    **assignment,
+                })
     return pd.DataFrame(rows, columns=IDENTITY_COLUMNS)

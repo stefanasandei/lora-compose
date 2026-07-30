@@ -1,0 +1,26 @@
+# @package _global_
+
+defaults:
+  - /base
+  - _self_
+
+composition:
+  method: ssr_merge
+  # Paper defaults: one short calibration pass and ridge-regularized routing.
+  regularization: 1.0e-4
+  calibration_steps: 1
+  seed: 42
+  height: 1024
+  width: 1024
+  guidance_scale: 3.8
+  # Supply one representative prompt per LoRA, in matching order.
+  # sources:
+  #   - path: ./outputs/jerry_lora_r32/epoch_200
+  #     prompt: "a portrait of Jerry Seinfeld"
+  #     weight: 1.0
+  #   - path: ./outputs/george_lora_r32/epoch_200
+  #     prompt: "a portrait of George Costanza"
+  #     weight: 1.0
+  sources: []
+
+output_dir: ./outputs/compositions/ssr_merge

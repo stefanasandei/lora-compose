@@ -1,0 +1,45 @@
+# @package _global_
+
+defaults:
+  - /base
+  - _self_
+
+characters:
+  - jerry
+  - george
+  - elaine
+  - kramer
+
+recipe:
+  method: joint
+
+adapter:
+  method: lora
+  # Four rank-32 adapters sum to an effective rank of 128.
+  r: 128
+  alpha: 128
+  target_modules: ".*\\.(to_k|to_q|to_v|to_out\\.0)"
+  dropout: 0.0
+  bias: none
+
+train:
+  # Match the 2400 per-character exposures used by four 200-epoch LoRAs.
+  # The balanced joint dataset has 48 images, for 9600 optimizer steps total.
+  epochs: 200
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  batch_size: 1
+  seed: 42
+  max_grad_norm: 1.0
+  gradient_checkpointing: true
+  save_every_epochs: 50
+  sample_every_epochs: 25
+
+sample_prompts:
+  - "Jerry Seinfeld and George Costanza sitting together at a diner table"
+  - "Jerry Seinfeld cooking while Kramer flips a pancake in a bright kitchen"
+  - "George Costanza and Elaine Benes riding bicycles through Central Park"
+  - "Elaine Benes playing a violin while Kramer plays a saxophone"
+  - "Jerry Seinfeld, George Costanza, and Elaine Benes together at a cafe"
+
+output_dir: ./outputs/joint_${adapter.method}_r${adapter.r}

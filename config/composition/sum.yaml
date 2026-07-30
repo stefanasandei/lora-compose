@@ -6,10 +6,14 @@ defaults:
 
 composition:
   method: sum
-  # Each source is a normal PEFT LoRA checkpoint:
-  # sources:
-  #   - path: ./outputs/jerry_lora_r32/epoch_200
-  #     weight: 1.0
-  sources: []
+  sources:
+    - path: ./outputs/jerry_dop_lora_r32_p3/epoch_200
+      weight: 0.5
+    - path: ./outputs/george_dop_lora_r32_p3/epoch_200
+      weight: 0.5
+    - path: ./outputs/elaine_dop_lora_r32_p3/epoch_200
+      weight: 0.5
+    - path: ./outputs/kramer_dop_lora_r32_p3/epoch_200
+      weight: 0.5
 
 output_dir: ./outputs/compositions/sum

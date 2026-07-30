@@ -1,8 +1,10 @@
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 
+from omegaconf import OmegaConf
 from peft import LoraConfig, get_peft_model, set_peft_model_state_dict
 from safetensors.torch import load_file
 
@@ -20,7 +22,7 @@ def _hash_files(paths):
     return digest.hexdigest()
 
 
-def load_adapter(source):
+def load_adapter(source, method="Sum"):
     """Load and minimally validate one standard PEFT LoRA."""
     path = Path(source.get("path")).expanduser().resolve()
     config_path, weights_path = path / CONFIG_FILE, path / WEIGHTS_FILE
@@ -31,9 +33,11 @@ def load_adapter(source):
     if config.get("peft_type") != "LORA" or any(
         config.get(key) for key in ("use_dora", "use_qalora", "target_parameters")
     ):
-        raise ValueError(f"Sum only supports standard LoRA adapters: {path}")
+        raise ValueError(f"{method} only supports standard LoRA adapters: {path}")
     if config.get("bias", "none") != "none" or config.get("modules_to_save"):
-        raise ValueError(f"Sum does not support extra adapter parameters: {path}")
+        raise ValueError(
+            f"{method} does not support extra adapter parameters: {path}"
+        )
 
     tensors = load_file(str(weights_path), device="cpu")
     a_keys = {key.removesuffix(".lora_A.weight") for key in tensors
@@ -47,6 +51,48 @@ def load_adapter(source):
         "config": config, "tensors": tensors,
         "sha256": _hash_files((config_path, weights_path)),
     }
+
+
+def load_sources(cfg, method, minimum=1, require_prompts=False):
+    sources = []
+    for configured in cfg.get("sources", []):
+        source = load_adapter(configured, method=method)
+        if require_prompts:
+            source["prompt"] = str(configured.get("prompt", "")).strip()
+            if not source["prompt"]:
+                raise ValueError(f"Each {method} source requires a prompt")
+        sources.append(source)
+    if len(sources) < minimum:
+        raise ValueError(
+            f"{method} composition requires at least {minimum} sources"
+        )
+
+    first = sources[0]
+    keys = set(first["tensors"])
+    structure = (
+        first["config"].get("target_modules"),
+        first["config"].get("fan_in_fan_out", False),
+    )
+    for source in sources[1:]:
+        other_structure = (
+            source["config"].get("target_modules"),
+            source["config"].get("fan_in_fan_out", False),
+        )
+        if set(source["tensors"]) != keys or other_structure != structure:
+            raise ValueError("Source adapters target different modules")
+    return sources
+
+
+def source_scale(source, rank):
+    config = source["config"]
+    denominator = math.sqrt(rank) if config.get("use_rslora") else rank
+    return source["weight"] * config["lora_alpha"] / denominator
+
+
+def resolved_configuration(cfg):
+    if OmegaConf.is_config(cfg):
+        return OmegaConf.to_container(cfg, resolve=True)
+    return dict(cfg)
 
 
 def install_adapter(transformer, tensors, source_config, rank, base_model):

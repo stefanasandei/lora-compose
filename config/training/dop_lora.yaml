@@ -31,10 +31,9 @@ train:
   max_grad_norm: 1.0
 
 sample_prompts:
-  - "a photo of Jerry Seinfeld performing stand-up comedy on a dark stage"
-  - "a portrait of Jerry Seinfeld, high quality"
-  - "a photo of Jerry Seinfeld sitting on a couch"
-  - "a photo of a man sitting on a couch"
-  - "a photo of Jerry Seinfeld in front of the Eiffel Tower"
+  - "a portrait of ${recipe.trigger_word}, high quality"
+  - "a photo of ${recipe.trigger_word} sitting at a diner"
+  - "a photo of ${recipe.trigger_word} in front of the Eiffel Tower"
+  - "a portrait of ${recipe.preservation_class}, high quality"
 
 output_dir: ./outputs/${character}_${recipe.method}_${adapter.method}_r${adapter.r}

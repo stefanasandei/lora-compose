@@ -1,29 +1,17 @@
-import math
-
 import torch
-from omegaconf import OmegaConf
 
-from .common import install_adapter, load_adapter
+from .common import (
+    install_adapter,
+    load_sources,
+    resolved_configuration,
+    source_scale,
+)
 
 
 def compose(transformer, cfg, base_model=None):
-    sources = [load_adapter(source) for source in cfg.get("sources", [])]
-    if not sources:
-        raise ValueError("Sum composition requires at least one source")
-
+    sources = load_sources(cfg, method="Sum")
     first = sources[0]
     keys = set(first["tensors"])
-    structure = (
-        first["config"].get("target_modules"),
-        first["config"].get("fan_in_fan_out", False),
-    )
-    for source in sources[1:]:
-        other_structure = (
-            source["config"].get("target_modules"),
-            source["config"].get("fan_in_fan_out", False),
-        )
-        if set(source["tensors"]) != keys or other_structure != structure:
-            raise ValueError("Source adapters target different modules")
 
     merged, ranks = {}, set()
     for a_key in sorted(key for key in keys if key.endswith(".lora_A.weight")):
@@ -43,10 +31,8 @@ def compose(transformer, cfg, base_model=None):
                 or config.get("alpha_pattern")
             ):
                 raise ValueError("Per-module ranks are not supported by sum")
-            alpha = config["lora_alpha"]
-            scale = alpha / (math.sqrt(rank) if config.get("use_rslora") else rank)
             downs.append(down)
-            ups.append(up * source["weight"] * scale)
+            ups.append(up * source_scale(source, rank))
         merged[a_key] = torch.cat(downs, dim=0)
         merged[b_key] = torch.cat(ups, dim=1)
         ranks.add(merged[a_key].shape[0])
@@ -57,10 +43,6 @@ def compose(transformer, cfg, base_model=None):
     adapter = install_adapter(
         transformer, merged, first["config"], effective_rank, base_model
     )
-    configuration = (
-        OmegaConf.to_container(cfg, resolve=True)
-        if OmegaConf.is_config(cfg) else dict(cfg)
-    )
     manifest = {
         "base_model": base_model,
         "method": "sum",
@@ -69,7 +51,7 @@ def compose(transformer, cfg, base_model=None):
             for source in sources
         ],
         "effective_rank": effective_rank,
-        "configuration": configuration,
+        "configuration": resolved_configuration(cfg),
         "artifact_format": "adapter",
     }
     return adapter, manifest

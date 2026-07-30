@@ -50,6 +50,55 @@ def headline_metrics(samples):
     }])
 
 
+def composition_headline_metrics(samples, identities):
+    composed_samples = samples[samples.subject_count >= 2]
+    composed_identities = identities[identities.subject_count >= 2]
+    identity = _assignment_mean(composed_identities, "similarity")
+    disentanglement = _assignment_mean(composed_identities, "correct")
+    prompt = prompt_mean(composed_samples, "CLIP_Score")
+    return pd.DataFrame([{
+        "Identity": identity,
+        "Disentanglement": disentanglement,
+        "Prompt_Adherence": prompt,
+        "Balanced_Score": harmonic_mean(
+            (identity, disentanglement, prompt)
+        ),
+    }])
+
+
+def _assignment_mean(frame, metric):
+    if frame.empty:
+        return np.nan
+    return (
+        frame.groupby(["prompt_id", "seed"], sort=False)[metric]
+        .mean()
+        .groupby("prompt_id")
+        .mean()
+        .mean()
+    )
+
+
+def summarize_identities(identities):
+    rows = []
+    groups = {
+        "single": identities[identities.subject_count == 1],
+        "composed": identities[identities.subject_count >= 2],
+    }
+    for group, frame in groups.items():
+        if frame.empty:
+            continue
+        rows.append({
+            "group": group,
+            "Identity": _assignment_mean(frame, "similarity"),
+            "Disentanglement": _assignment_mean(frame, "correct"),
+            "Identity_Margin": _assignment_mean(frame, "identity_margin"),
+            "Face_Assignment_Rate": _assignment_mean(frame, "matched"),
+            "n_prompts": int(frame.prompt_id.nunique()),
+            "n_assignments": len(frame),
+        })
+    return pd.DataFrame(rows)
+
+
 def summarize_samples(samples, num_bootstrap):
     rows = []
     for group, frame in samples.groupby("group", sort=False):

@@ -1,0 +1,42 @@
+# @package _global_
+
+defaults:
+  - /base
+  - _self_
+
+characters:
+  - jerry
+  - george
+  - elaine
+  - kramer
+
+recipe:
+  method: joint
+
+adapter:
+  method: oftv2
+  block_size: 140
+  target_modules: ".*\\.(to_k|to_q|to_v|to_out\\.0)"
+  dropout: 0.05
+  bias: none
+  num_cayley_neumann_terms: 5
+
+train:
+  # 48 balanced images per epoch, for 2400 optimizer steps.
+  epochs: 50
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  batch_size: 1
+  seed: 42
+  max_grad_norm: 1.0
+  gradient_checkpointing: true
+  sample_every_epochs: 10
+
+sample_prompts:
+  - "Jerry Seinfeld and George Costanza sitting together at a diner table"
+  - "Jerry Seinfeld cooking while Kramer flips a pancake in a bright kitchen"
+  - "George Costanza and Elaine Benes riding bicycles through Central Park"
+  - "Elaine Benes playing a violin while Kramer plays a saxophone"
+  - "Jerry Seinfeld, George Costanza, and Elaine Benes together at a cafe"
+
+output_dir: ./outputs/joint_${adapter.method}_b${adapter.block_size}

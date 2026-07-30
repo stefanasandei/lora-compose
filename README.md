@@ -20,16 +20,22 @@ We used `Efficient-Large-Model/SANA1.5_1.6B_1024px_diffusers` as the backbone fo
 
 We compare several methods for composition of multiple adapters, while focusing only on approaches that don't add inference overhead. The best result in each column is **bold** and the second-best is <u>underlined</u> within each table:
 
-| Method                | Identity $\uparrow$ | Disentanglement $\uparrow$ | Prompt $\uparrow$ | Balanced $\uparrow$ |
-| --------------------- | ------------------- | -------------------------- | ----------------- | ------------------- |
-| Baseline (sum)        | —                   | —                          | —                 | —                   |
-| Joint training        | —                   | —                          | —                 | —                   |
-| LoRACLR               | —                   | —                          | —                 | —                   |
-| Orthogonal Adaptation | —                   | —                          | —                 | —                   |
-| SSR-Merge             | —                   | —                          | —                 | —                   |
+| Method                | Adapter  | Identity $\uparrow$ | Disentanglement $\uparrow$ | Prompt $\uparrow$ | Balanced $\uparrow$ |
+| --------------------- | -------- | ------------------- | -------------------------- | ----------------- | ------------------- |
+| Sum                   | LoRA     | 0.157               | 0.078                      | 0.376             | 0.137               |
+| Sum                   | DOP-LoRA | 0.167               | 0.057                      | 0.350             | 0.114               |
+| Joint training        | OFTv2    | —                   | —                          | —                 | —                   |
+| Orthogonal Adaptation | LoRA     | —                   | —                          | —                 | —                   |
 
 
-<!-- todo explain the headline metrics -->
+<!-- | SSR-Merge             | LoRA    | —                   | —                          | —                 | —                   | -->
+
+For composed prompts, identity is the ArcFace similarity after optimal
+subject-to-face assignment, with missing subjects scored as zero.
+Disentanglement is the rate at which an expected subject is both above the
+identity threshold and the closest configured identity to its assigned face.
+Prompt is CLIP alignment on prompts containing two or three subjects. Balanced
+is the equal-weight harmonic mean of these three metrics.
 
 Additionally, we train single subject adapters to compare individual-concept training. For the hyperparameters of each methods, please check its coresponding config file under `./config/training`. Each adapter has been trained for at most 2400 steps:
 
@@ -87,6 +93,8 @@ Run the configured evaluation with:
 
 ```bash
 ./scripts/eval.sh
+# or
+./scripts/eval.sh --config-name=eval_composed
 ```
 
 ### Implementation details
@@ -99,7 +107,7 @@ Similarly, we have more abstractions, which can be composed easily from configs:
 | ----------- | --------------------------------------------------------- | --------------------------------------------- |
 | Recipe      | Construct training examples, batching, and loss           | Standard, DOP, DreamBooth, joint training     |
 | Adapter     | Define the trainable parameterization and optimizer hooks | LoRA, OFTv2, Orthogonal LoRA                  |
-| Composition | Transform completed adapters into one deployable artifact | Sum, LoRACLR, SSR-Merge                       |
+| Composition | Transform completed adapters into one deployable artifact | Sum, SSR-Merge                                |
 | Evaluation  | Sample and measure any completed artifact                 | ArcFace, CLIP, DINO, preservation, efficiency |
 
 ## License

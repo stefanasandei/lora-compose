@@ -1,0 +1,18 @@
+defaults:
+  - base
+  - _self_
+
+num_seeds: 2
+num_bootstrap: 5000
+max_subjects: 3
+
+adapter_path: ./outputs/compositions/sum
+run_name: seinfeld_sum
+characters:
+  - jerry
+  - george
+  - elaine
+  - kramer
+
+prompts_file: ${dataset_dir}/evals/prompts_composed.json
+arcface_root: ${cache_dir}
