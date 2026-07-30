@@ -22,20 +22,11 @@ We compare several methods for composition of multiple adapters, while focusing 
 
 | Method                | Adapter  | Identity $\uparrow$ | Disentanglement $\uparrow$ | Prompt $\uparrow$ | Balanced $\uparrow$ |
 | --------------------- | -------- | ------------------- | -------------------------- | ----------------- | ------------------- |
-| Sum                   | LoRA     | 0.157               | 0.078                      | 0.376             | 0.137               |
-| Sum                   | DOP-LoRA | 0.167               | 0.057                      | 0.350             | 0.114               |
+| Sum                   | LoRA     | 0.159               | 0.078                      | 0.376             | 0.138               |
+| Sum                   | DOP-LoRA | 0.195               | 0.057                      | 0.350             | 0.118               |
+| SSR Merge             | DOP-LoRA | 0.259               | 0.109                      | 0.372             | 0.191               |
 | Joint training        | OFTv2    | —                   | —                          | —                 | —                   |
 | Orthogonal Adaptation | LoRA     | —                   | —                          | —                 | —                   |
-
-
-<!-- | SSR-Merge             | LoRA    | —                   | —                          | —                 | —                   | -->
-
-For composed prompts, identity is the ArcFace similarity after optimal
-subject-to-face assignment, with missing subjects scored as zero.
-Disentanglement is the rate at which an expected subject is both above the
-identity threshold and the closest configured identity to its assigned face.
-Prompt is CLIP alignment on prompts containing two or three subjects. Balanced
-is the equal-weight harmonic mean of these three metrics.
 
 Additionally, we train single subject adapters to compare individual-concept training. For the hyperparameters of each methods, please check its coresponding config file under `./config/training`. Each adapter has been trained for at most 2400 steps:
 

@@ -6,21 +6,30 @@ defaults:
 
 composition:
   method: ssr_merge
-  # Paper defaults: one short calibration pass and ridge-regularized routing.
-  regularization: 1.0e-4
-  calibration_steps: 1
+  # Ridge regularization added to normalized correlation G/N.
+  regularization: 1.0e-5
+  # Number of denoising timesteps per calibration forward pass (multi-timestep).
+  calibration_steps: 4
+  # Number of different random seeds run per source (multi-seed).
+  calibration_seeds: 8
+  # Guidance scale used during calibration (1.0 = no CFG — cleaner features).
+  calibration_guidance_scale: 1.0
   seed: 42
   height: 1024
   width: 1024
-  guidance_scale: 3.8
   # Supply one representative prompt per LoRA, in matching order.
-  # sources:
-  #   - path: ./outputs/jerry_lora_r32/epoch_200
-  #     prompt: "a portrait of Jerry Seinfeld"
-  #     weight: 1.0
-  #   - path: ./outputs/george_lora_r32/epoch_200
-  #     prompt: "a portrait of George Costanza"
-  #     weight: 1.0
-  sources: []
+  sources:
+    - path: ./outputs/jerry_dop_lora_r32_p3/epoch_200
+      prompt: "a portrait photo of Jerry Seinfeld"
+      weight: 1.0
+    - path: ./outputs/george_dop_lora_r32_p3/epoch_200
+      prompt: "a portrait photo of George Costanza"
+      weight: 1.0
+    - path: ./outputs/elaine_dop_lora_r32_p3/epoch_200
+      prompt: "a portrait photo of Elaine Benes"
+      weight: 1.0
+    - path: ./outputs/kramer_dop_lora_r32_p3/epoch_200
+      prompt: "a portrait photo of Kramer"
+      weight: 1.0
 
 output_dir: ./outputs/compositions/ssr_merge

@@ -51,9 +51,10 @@ def headline_metrics(samples):
 
 
 def composition_headline_metrics(samples, identities):
-    composed_samples = samples[samples.subject_count >= 2]
+    single_identities = identities[identities.subject_count == 1]
     composed_identities = identities[identities.subject_count >= 2]
-    identity = _assignment_mean(composed_identities, "similarity")
+    composed_samples = samples[samples.subject_count >= 2]
+    identity = _assignment_mean(single_identities, "similarity")
     disentanglement = _assignment_mean(composed_identities, "correct")
     prompt = prompt_mean(composed_samples, "CLIP_Score")
     return pd.DataFrame([{

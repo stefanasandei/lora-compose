@@ -6,8 +6,8 @@ num_seeds: 2
 num_bootstrap: 5000
 max_subjects: 3
 
-adapter_path: ./outputs/compositions/sum
-run_name: seinfeld_sum
+adapter_path: ./outputs/compositions/ssr_merge
+run_name: seinfeld_ssr
 characters:
   - jerry
   - george

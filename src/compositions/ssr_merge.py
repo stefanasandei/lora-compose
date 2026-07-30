@@ -135,29 +135,32 @@ def _calibrate(pipeline, sources, statistics, cfg):
 
     calibration = {"task": 0}
     handles = _attach_hooks(transformer, statistics, calibration)
+    num_seeds = int(cfg.get("calibration_seeds", 1))
+    num_steps = int(cfg.get("calibration_steps", 1))
+    calib_guidance = float(cfg.get("calibration_guidance_scale", 1.0))
+    base_seed = int(cfg.get("seed", 42))
     try:
+        log.info(
+            "Calibrating SSR-Merge: %d sources, %d seeds, %d steps per source",
+            len(sources), num_seeds, num_steps,
+        )
         for index, source in enumerate(sources):
             calibration["task"] = index
             transformer.set_adapter(f"source_{index}", inference_mode=True)
-            generator = torch.Generator(device="cpu").manual_seed(
-                int(cfg.get("seed", 42))
-            )
-            log.info(
-                "Calibrating SSR-Merge source %d/%d with %r",
-                index + 1,
-                len(sources),
-                source["prompt"],
-            )
-            with torch.inference_mode():
-                pipeline(
-                    prompt=source["prompt"],
-                    generator=generator,
-                    num_inference_steps=int(cfg.get("calibration_steps", 1)),
-                    height=int(cfg.get("height", 1024)),
-                    width=int(cfg.get("width", 1024)),
-                    guidance_scale=float(cfg.get("guidance_scale", 3.8)),
-                    output_type="latent",
+            for seed_offset in range(num_seeds):
+                generator = torch.Generator(device="cpu").manual_seed(
+                    base_seed + seed_offset
                 )
+                with torch.inference_mode():
+                    pipeline(
+                        prompt=source["prompt"],
+                        generator=generator,
+                        num_inference_steps=num_steps,
+                        height=int(cfg.get("height", 1024)),
+                        width=int(cfg.get("width", 1024)),
+                        guidance_scale=calib_guidance,
+                        output_type="latent",
+                    )
     finally:
         _remove_hooks(handles, statistics, transformer)
     pipeline.transformer = transformer.unload()
