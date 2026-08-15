@@ -20,13 +20,12 @@ We used `Efficient-Large-Model/SANA1.5_1.6B_1024px_diffusers` as the backbone fo
 
 We compare several methods for composition of multiple adapters, while focusing only on approaches that don't add inference overhead. The best result in each column is **bold** and the second-best is <u>underlined</u> within each table:
 
-| Method                | Adapter  | Identity $\uparrow$ | Disentanglement $\uparrow$ | Prompt $\uparrow$ | Balanced $\uparrow$ |
-| --------------------- | -------- | ------------------- | -------------------------- | ----------------- | ------------------- |
-| Sum                   | LoRA     | 0.159               | 0.078                      | 0.376             | 0.138               |
-| Sum                   | DOP-LoRA | 0.195               | 0.057                      | 0.350             | 0.118               |
-| SSR Merge             | DOP-LoRA | 0.259               | 0.109                      | 0.372             | 0.191               |
-| Joint training        | OFTv2    | —                   | —                          | —                 | —                   |
-| Orthogonal Adaptation | LoRA     | —                   | —                          | —                 | —                   |
+| Method    | Adapter  | Identity $\uparrow$ | Disentanglement $\uparrow$ | Prompt $\uparrow$ | Balanced $\uparrow$ |
+| --------- | -------- | ------------------- | -------------------------- | ----------------- | ------------------- |
+| Sum       | LoRA     | 0.159               | 0.078                      | 0.376             | 0.138               |
+| Sum       | DOP-LoRA | 0.195               | 0.057                      | 0.350             | 0.118               |
+| SSR Merge | DOP-LoRA | 0.259               | 0.109                      | 0.372             | 0.191               |
+| IterIS    | DOP-LoRA | 0.277               | 0.166                      | 0.376             | 0.244               |
 
 Additionally, we train single subject adapters to compare individual-concept training. For the hyperparameters of each methods, please check its coresponding config file under `./config/training`. Each adapter has been trained for at most 2400 steps:
 
@@ -98,7 +97,7 @@ Similarly, we have more abstractions, which can be composed easily from configs:
 | ----------- | --------------------------------------------------------- | --------------------------------------------- |
 | Recipe      | Construct training examples, batching, and loss           | Standard, DOP, DreamBooth, joint training     |
 | Adapter     | Define the trainable parameterization and optimizer hooks | LoRA, OFTv2, Orthogonal LoRA                  |
-| Composition | Transform completed adapters into one deployable artifact | Sum, SSR-Merge                                |
+| Composition | Transform completed adapters into one deployable artifact | Sum, SSR-Merge, IterIS                        |
 | Evaluation  | Sample and measure any completed artifact                 | ArcFace, CLIP, DINO, preservation, efficiency |
 
 ## License

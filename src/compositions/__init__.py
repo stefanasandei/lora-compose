@@ -1,7 +1,8 @@
-from . import ssr_merge, sum
+from . import iteris, ssr_merge, sum
 
 
 methods = {
+    "iteris": iteris,
     "ssr_merge": ssr_merge,
     "sum": sum,
 }

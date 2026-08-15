@@ -1,0 +1,39 @@
+# @package _global_
+
+defaults:
+  - /base
+  - _self_
+
+composition:
+  method: iteris
+  # Frobenius-scaled regularization from Equation 7 of the IterIS paper.
+  regularization: 1.0e-4
+  iterations: 5
+  calibration_steps: 4
+  calibration_seeds: 8
+  # CountSketch width per source and layer. Every activation contributes while
+  # RAM stays bounded and the solve remains fixed at the joint LoRA rank.
+  feature_samples: 256
+  calibration_guidance_scale: 1.0
+  seed: 42
+  height: 1024
+  width: 1024
+  sources:
+    - path: /mnt/projects/others/jerry_dop_lora_r32_p3/epoch_200
+      prompts:
+        - "a portrait photo of Jerry Seinfeld alone"
+      weight: 1.0
+    - path: /mnt/projects/others/george_dop_lora_r32_p3/epoch_200
+      prompts:
+        - "a portrait photo of George Costanza alone"
+      weight: 1.0
+    - path: /mnt/projects/others/elaine_dop_lora_r32_p3/epoch_200
+      prompts:
+        - "a portrait photo of Elaine Benes alone"
+      weight: 1.0
+    - path: /mnt/projects/others/kramer_dop_lora_r32_p3/epoch_200
+      prompts:
+        - "a portrait photo of Kramer alone"
+      weight: 1.0
+
+output_dir: /mnt/projects/others/outputs/compositions/iteris
