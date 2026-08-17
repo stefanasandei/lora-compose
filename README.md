@@ -27,6 +27,22 @@ We compare several methods for composition of multiple adapters, while focusing 
 | SSR Merge | DOP-LoRA | 0.259               | 0.109                      | 0.372             | 0.191               |
 | IterIS    | DOP-LoRA | 0.277               | 0.166                      | 0.376             | 0.244               |
 
+<details>
+
+<summary>Additional methods tried</summary>
+
+Methods tried, but resulted in results too poor (due to either constraints or the SANA model): LoRACLR, QR-LoRA, BlockLoRA, Multi-SBoRA. We noticed, in general for this model, that methods which restrict rows of learned matrices result in very poor identity.
+
+Methods whose strength is not fairly represented by this eval:
+
+| Method | Adapter  | Identity $\uparrow$ | Disentanglement $\uparrow$ | Prompt $\uparrow$ | Balanced $\uparrow$ |
+| ------ | -------- | ------------------- | -------------------------- | ----------------- | ------------------- |
+| TIES   | DOP-LoRA | 0.142               | 0.057                      | 0.366             | 0.110               |
+
+TIES-Merging targets multi-task merging, where fine-tuned task vectors actively conflict in sign; its trim, sign-election, and disjoint merge resolve exactly that interference. This composition eval poses no such sign conflict, so TIES's majority-vote merge only discards per-concept signal that naive sum preserves, and its elementwise operation breaks low rank (requiring SVD re-compression), which this eval fairly penalizes but which the method was never designed to win.
+
+</details>
+
 Additionally, we train single subject adapters to compare individual-concept training. For the hyperparameters of each methods, please check its coresponding config file under `./config/training`. Each adapter has been trained for at most 2400 steps:
 
 | Method | Identity $\uparrow$ | Prompt $\uparrow$ | Leakage $\downarrow$ | Preservation $\uparrow$ | Balanced $\uparrow$ |

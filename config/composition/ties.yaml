@@ -1,0 +1,26 @@
+# @package _global_
+
+defaults:
+  - /base
+  - _self_
+
+composition:
+  method: ties
+  # Paper's validation-free recipe: keep the top 20% and use lambda = 1.
+  density: 0.2
+  merge_scale: 1.0
+  # Elementwise TIES breaks low rank. Compress the dense merged update back to
+  # the same deployable rank as concatenating four rank-32 source adapters.
+  rank: 128
+  seed: 42
+  sources:
+    - path: /mnt/projects/others/jerry_dop_lora_r32_p3/epoch_200
+      weight: 1.0
+    - path: /mnt/projects/others/george_dop_lora_r32_p3/epoch_200
+      weight: 1.0
+    - path: /mnt/projects/others/elaine_dop_lora_r32_p3/epoch_200
+      weight: 1.0
+    - path: /mnt/projects/others/kramer_dop_lora_r32_p3/epoch_200
+      weight: 1.0
+
+output_dir: /mnt/projects/others/compositions/ties
