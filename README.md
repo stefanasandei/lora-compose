@@ -48,6 +48,7 @@ Additionally, we train single subject adapters to compare individual-concept tra
 | Method | Identity $\uparrow$ | Prompt $\uparrow$ | Leakage $\downarrow$ | Preservation $\uparrow$ | Balanced $\uparrow$ |
 | ------ | ------------------- | ----------------- | -------------------- | ----------------------- | ------------------- |
 | LoRA   | 0.402               | <u>0.359</u>      | 0.217                | 0.792                   | 0.597               |
+| NoRA   | 0.428               | 0.360             | 0.249                | 0.811                   | 0.612               |
 | DoRA   | 0.395               | 0.353             | 0.217                | 0.790                   | 0.591               |
 | LoKr   | 0.369               | 0.358             | <u>0.167</u>         | **0.802**               | 0.582               |
 | LoHa   | 0.184               | 0.338             | **0.087**            | <u>0.798</u>            | 0.385               |

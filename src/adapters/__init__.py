@@ -1,8 +1,7 @@
-from peft import get_peft_model
 import torch
+from peft import get_peft_model
 
-from . import coftv2, dora, loha, lokr, lora, oftv2, peanut, pissa
-
+from . import coftv2, dora, loha, lokr, lora, nora, oftv2, peanut, pissa
 
 methods = {
     "coftv2": coftv2,
@@ -10,6 +9,7 @@ methods = {
     "loha": loha,
     "lokr": lokr,
     "lora": lora,
+    "nora": nora,
     "oftv2": oftv2,
     "peanut": peanut,
     "pissa": pissa,
@@ -18,6 +18,11 @@ methods = {
 
 def apply_adapter(transformer, cfg_adapter: dict, **prepare_kwargs):
     method = methods[cfg_adapter.method]
+    if hasattr(method, "apply"):
+        transformer = method.apply(transformer, cfg_adapter)
+        if hasattr(transformer, "print_trainable_parameters"):
+            transformer.print_trainable_parameters()
+        return transformer
     if hasattr(method, "prepare"):
         method.prepare(transformer, cfg_adapter, **prepare_kwargs)
 

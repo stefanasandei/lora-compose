@@ -1,0 +1,33 @@
+# @package _global_
+
+defaults:
+  - /base
+  - _self_
+
+character: jerry
+
+recipe:
+  method: standard
+
+adapter:
+  method: nora
+  r: 32
+  alpha: 64
+  target_modules: ".*\\.(to_k|to_q|to_v|to_out\\.0)"
+  dropout: 0.0
+  eps: 1.0e-6
+
+train:
+  epochs: 200
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  batch_size: 1
+  seed: 42
+  max_grad_norm: 1.0
+
+sample_prompts:
+  - "Jerry Seinfeld wearing a suit on stage"
+  - "a portrait of Jerry Seinfeld, high quality"
+  - "Jerry Seinfeld sitting on a couch"
+
+output_dir: ./outputs/${character}_${adapter.method}_r${adapter.r}_a${adapter.alpha}
