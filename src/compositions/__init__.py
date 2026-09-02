@@ -1,13 +1,12 @@
-from . import iteris, ssr_merge, sum, ties
-
+from . import iteris, regmean_pp, ssr_merge, sum, ties
 
 methods = {
     "iteris": iteris,
+    "regmean_pp": regmean_pp,
     "ssr_merge": ssr_merge,
     "sum": sum,
     "ties": ties,
 }
-
 
 def requires_pipeline(method_name):
     method = methods.get(method_name)

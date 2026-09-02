@@ -1,0 +1,41 @@
+# @package _global_
+
+defaults:
+  - /base
+  - _self_
+
+composition:
+  method: regmean_pp
+  # Scaling of the Gram off-diagonals: alpha=1 is pure regression, smaller
+  # values add diag(G) regularization toward plain averaging.
+  alpha: 0.9
+  # Ridge added to the summed Gram for a stable inversion.
+  regularization: 1.0e-6
+  # merged   = RegMean++: features come from the progressively merged model
+  # candidate = plain RegMean: each candidate's own features
+  features_mode: merged
+  # Output LoRA rank for the merged dense deltas (default: sum of source ranks).
+  rank: 128
+  # Denoising steps and noise latents sampled per calibration probe.
+  calibration_steps: 2
+  calibration_seeds: 2
+  # uniform = full schedule, late = low-noise/structural half only.
+  calibration_timesteps: late
+  seed: 42
+  max_sequence_length: 300
+  # One representative prompt per LoRA, matching the SSR-Merge recipe.
+  sources:
+    - path: /mnt/projects/others/jerry_dop_lora_r32_p3/epoch_200
+      prompt: "a portrait photo of Jerry Seinfeld"
+      weight: 1.0
+    - path: /mnt/projects/others/george_dop_lora_r32_p3/epoch_200
+      prompt: "a portrait photo of George Costanza"
+      weight: 1.0
+    - path: /mnt/projects/others/elaine_dop_lora_r32_p3/epoch_200
+      prompt: "a portrait photo of Elaine Benes"
+      weight: 1.0
+    - path: /mnt/projects/others/kramer_dop_lora_r32_p3/epoch_200
+      prompt: "a portrait photo of Kramer"
+      weight: 1.0
+
+output_dir: /mnt/projects/others/compositions/regmean_pp

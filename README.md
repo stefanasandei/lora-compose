@@ -24,8 +24,9 @@ We compare several methods for composition of multiple adapters, while focusing 
 | --------- | -------- | ------------------- | -------------------------- | ----------------- | ------------------- |
 | Sum       | LoRA     | 0.206               | 0.078                      | 0.357             | 0.178               |
 | Sum       | DOP-LoRA | 0.256               | 0.057                      | 0.340             | 0.250               |
-| SSR Merge | DOP-LoRA | <ins>0.325</ins>        | <ins>0.109</ins>               | <ins>0.361</ins>      | <ins>0.275</ins>        |
-| IterIS    | DOP-LoRA | **0.354**           | **0.167**                  | **0.365**         | **0.336**           |
+| SSR Merge | DOP-LoRA | <ins>0.325</ins>        | 0.109                      | 0.361             | 0.275               |
+| RegMean++ | DOP-LoRA | 0.292               | <ins>0.135</ins>               | **0.375**         | <ins>0.284</ins>        |
+| IterIS    | DOP-LoRA | **0.354**           | **0.167**                  | <ins>0.365</ins>      | **0.336**           |
 
 Identity is normalized against the subject's own reference-photo ceiling, disentanglement is the correct-assignment rate on multi-subject prompts, and balanced is `Identity_norm * sqrt(Preservation)` where preservation is LPIPS similarity to the frozen model on non-target prompts.
 
