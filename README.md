@@ -24,7 +24,7 @@ We compare several methods for composition of multiple adapters, while focusing 
 | --------- | -------- | ------------------- | -------------------------- | ----------------- | ------------------- |
 | Sum       | LoRA     | 0.206               | 0.078                      | 0.357             | 0.178               |
 | Sum       | DOP-LoRA | 0.256               | 0.057                      | 0.340             | 0.250               |
-| SSR Merge | DOP-LoRA | <u>0.325</u>        | <u>0.109</u>               | <u>0.361</u>      | <u>0.275</u>        |
+| SSR Merge | DOP-LoRA | <ins>0.325</ins>        | <ins>0.109</ins>               | <ins>0.361</ins>      | <ins>0.275</ins>        |
 | IterIS    | DOP-LoRA | **0.354**           | **0.167**                  | **0.365**         | **0.336**           |
 
 Identity is normalized against the subject's own reference-photo ceiling, disentanglement is the correct-assignment rate on multi-subject prompts, and balanced is `Identity_norm * sqrt(Preservation)` where preservation is LPIPS similarity to the frozen model on non-target prompts.
@@ -50,12 +50,12 @@ Additionally, we train single subject adapters to compare individual-concept tra
 | Method | Identity $\uparrow$ | Prompt $\uparrow$ | Preservation $\uparrow$ | Balanced $\uparrow$ |
 | ------ | ------------------- | ----------------- | ----------------------- | ------------------- |
 | LoRA   | 0.491               | 0.359             | 0.717                   | 0.416               |
-| NoRA   | 0.523               | <u>0.360</u>      | 0.657                   | 0.423               |
+| NoRA   | 0.523               | <ins>0.360</ins>      | 0.657                   | 0.423               |
 | DoRA   | 0.483               | 0.353             | 0.722                   | 0.411               |
-| LoKr   | 0.451               | 0.358             | <u>0.746</u>            | 0.390               |
+| LoKr   | 0.451               | 0.358             | <ins>0.746</ins>            | 0.390               |
 | LoHa   | 0.225               | 0.339             | **0.779**               | 0.198               |
 | PiSSA  | 0.457               | 0.359             | 0.626                   | 0.361               |
-| OFTv2  | <u>0.599</u>        | **0.366**         | 0.657                   | <u>0.486</u>        |
+| OFTv2  | <ins>0.599</ins>        | **0.366**         | 0.657                   | <ins>0.486</ins>        |
 | COFTv2 | 0.402               | 0.355             | 0.712                   | 0.339               |
 | PEANuT | **0.629**           | 0.349             | 0.604                   | **0.489**           |
 
@@ -65,9 +65,9 @@ Comparison using different training recipes:
 
 | Method           | Identity $\uparrow$ | Prompt $\uparrow$ | Preservation $\uparrow$ | Balanced $\uparrow$ |
 | ---------------- | ------------------- | ----------------- | ----------------------- | ------------------- |
-| DreamBooth-LoRA  | 0.377               | **0.361**         | <u>0.703</u>            | 0.316               |
-| DOP-LoRA         | <u>0.537</u>        | 0.345             | **0.766**               | <u>0.470</u>        |
-| DreamBooth-OFTv2 | 0.507               | <u>0.357</u>      | 0.682                   | 0.418               |
+| DreamBooth-LoRA  | 0.377               | **0.361**         | <ins>0.703</ins>            | 0.316               |
+| DOP-LoRA         | <ins>0.537</ins>        | 0.345             | **0.766**               | <ins>0.470</ins>        |
+| DreamBooth-OFTv2 | 0.507               | <ins>0.357</ins>      | 0.682                   | 0.418               |
 | DOP-OFTv2        | **0.651**           | 0.343             | 0.681                   | **0.537**           |
 
 <details>
@@ -78,9 +78,9 @@ Comparison using different training recipes:
 | ------------------------- | ------------------- | ----------------- | ----------------------- | ------------------- |
 | OFTv2 (epochs=100, b=80)  | 0.529               | **0.368**         | 0.695                   | 0.441               |
 | OFTv2 (epochs=200, b=140) | **0.617**           | 0.357             | 0.596                   | **0.477**           |
-| LoKr (r=128)              | 0.387               | <u>0.358</u>      | **0.772**               | 0.340               |
+| LoKr (r=128)              | 0.387               | <ins>0.358</ins>      | **0.772**               | 0.340               |
 | NoRA (r=32, alpha=32)     | 0.431               | 0.358             | 0.694                   | 0.359               |
-| LoRA (r=32, alpha=64)     | <u>0.566</u>        | 0.357             | <u>0.702</u>            | <u>0.474</u>        |
+| LoRA (r=32, alpha=64)     | <ins>0.566</ins>        | 0.357             | <ins>0.702</ins>            | <ins>0.474</ins>        |
 </details>
 
 ## Usage
