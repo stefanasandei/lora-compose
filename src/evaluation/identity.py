@@ -37,7 +37,7 @@ def face_embedding(app, image):
 
 
 def build_reference_embeddings(app, subject_directories):
-    references, counts = {}, {}
+    references, counts, ceilings = {}, {}, {}
     for subject, directory in subject_directories.items():
         embeddings = []
         for filename in sorted(os.listdir(directory)):
@@ -50,9 +50,11 @@ def build_reference_embeddings(app, subject_directories):
         if not embeddings:
             raise ValueError(f"No faces detected in subject references: {directory}")
         reference = np.mean(embeddings, axis=0)
-        references[subject] = reference / np.linalg.norm(reference)
+        reference = reference / np.linalg.norm(reference)
+        references[subject] = reference
         counts[subject] = len(embeddings)
-    return references, counts
+        ceilings[subject] = float(np.mean(embeddings @ reference))
+    return references, counts, ceilings
 
 
 def assign_identities(expected, faces, references, threshold):

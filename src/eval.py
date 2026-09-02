@@ -188,7 +188,7 @@ def run_eval(cfg: DictConfig):
         subject: Path(cfg.dataset_dir) / subject
         for subject in subjects
     }
-    references, reference_counts = build_reference_embeddings(
+    references, reference_counts, identity_ceilings = build_reference_embeddings(
         face_app, subject_directories
     )
     for subject, count in reference_counts.items():
@@ -226,9 +226,11 @@ def run_eval(cfg: DictConfig):
     )
     identity_summary = summarize_identities(identities)
     if any(len(prompt["subjects"]) > 1 for prompt in prompts):
-        headline = composition_headline_metrics(samples, identities)
+        headline = composition_headline_metrics(
+            samples, identities, identity_ceilings
+        )
     else:
-        headline = headline_metrics(samples)
+        headline = headline_metrics(samples, identity_ceilings[subjects[0]])
 
     output_dir.mkdir(parents=True, exist_ok=True)
     samples.to_csv(output_dir / "sample_metrics.csv", index=False)

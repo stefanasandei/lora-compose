@@ -7,6 +7,20 @@ METRICS = (
     "ArcFace_Target", "Base_ArcFace_Target",
 )
 
+# Intrinsic ceiling of the ArcFace identity metric for the trained subject:
+# the mean self-similarity of the subject's reference photos against their own
+# mean embedding. Independent of the collected eval metrics.
+IDENTITY_CEILING = 0.819
+
+
+def lpips_preservation(frame):
+    return prompt_mean(
+        frame.assign(
+            LPIPS_Preservation=np.clip(1 - frame["LPIPS_Base_Distance"], 0, 1)
+        ),
+        "LPIPS_Preservation",
+    )
+
 
 def clustered_interval(frame, metric, num_bootstrap=5000, seed=0):
     prompt_means = (
@@ -34,36 +48,41 @@ def harmonic_mean(values):
     return len(values) / np.reciprocal(values).sum()
 
 
-def headline_metrics(samples):
+def headline_metrics(samples, identity_ceiling=None):
+    if identity_ceiling is None:
+        identity_ceiling = IDENTITY_CEILING
     target = samples[samples.group == "target"]
-    other = samples[samples.group == "other_identity"]
     non_target = samples[samples.group != "target"]
     identity = prompt_mean(target, "ArcFace_Target")
-    leakage = prompt_mean(other, "ArcFace_Target")
-    preservation = prompt_mean(non_target, "DINO_Base_Preservation")
+    identity_norm = np.clip(identity / identity_ceiling, 0, 1)
+    preservation = lpips_preservation(non_target)
     return pd.DataFrame([{
         "Identity": identity,
+        "Identity_Norm": identity_norm,
         "Prompt_Adherence": prompt_mean(target, "CLIP_Score"),
-        "Concept_Leakage": leakage,
-        "Model_Preservation": preservation,
-        "Balanced_Score": harmonic_mean((identity, 1 - leakage, preservation)),
+        "LPIPS_Preservation": preservation,
+        "Balanced_Score": identity_norm * np.sqrt(preservation),
     }])
 
 
-def composition_headline_metrics(samples, identities):
+def composition_headline_metrics(samples, identities, identity_ceilings=None):
     single_identities = identities[identities.subject_count == 1]
     composed_identities = identities[identities.subject_count >= 2]
     composed_samples = samples[samples.subject_count >= 2]
     identity = _assignment_mean(single_identities, "similarity")
+    identity_norm = _ceiling_normalized_assignment_mean(
+        single_identities, identity_ceilings
+    )
     disentanglement = _assignment_mean(composed_identities, "correct")
     prompt = prompt_mean(composed_samples, "CLIP_Score")
+    preservation = lpips_preservation(samples[samples.group != "target"])
     return pd.DataFrame([{
         "Identity": identity,
+        "Identity_Norm": identity_norm,
         "Disentanglement": disentanglement,
         "Prompt_Adherence": prompt,
-        "Balanced_Score": harmonic_mean(
-            (identity, disentanglement, prompt)
-        ),
+        "LPIPS_Preservation": preservation,
+        "Balanced_Score": identity_norm * np.sqrt(preservation),
     }])
 
 
@@ -72,6 +91,28 @@ def _assignment_mean(frame, metric):
         return np.nan
     return (
         frame.groupby(["prompt_id", "seed"], sort=False)[metric]
+        .mean()
+        .groupby("prompt_id")
+        .mean()
+        .mean()
+    )
+
+
+def _ceiling_normalized_assignment_mean(frame, identity_ceilings):
+    if frame.empty:
+        return np.nan
+    ceilings = identity_ceilings or {}
+    rows = []
+    for _, row in frame.iterrows():
+        ceiling = ceilings.get(row["expected_subject"], IDENTITY_CEILING)
+        rows.append({
+            "prompt_id": row["prompt_id"],
+            "seed": row["seed"],
+            "Identity_Norm": np.clip(row["similarity"] / ceiling, 0, 1),
+        })
+    normalized = pd.DataFrame(rows)
+    return (
+        normalized.groupby(["prompt_id", "seed"])["Identity_Norm"]
         .mean()
         .groupby("prompt_id")
         .mean()

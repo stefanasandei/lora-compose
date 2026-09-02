@@ -88,8 +88,10 @@ def evaluate_samples(
     image_path,
     device,
     primary_subject_embedding=None,
+    metrics=None,
 ):
-    metrics = SampleMetrics(device)
+    if metrics is None:
+        metrics = SampleMetrics(device)
     rows = []
     for prompt_index, prompt_info in enumerate(prompts):
         prompt = prompt_info["prompt"]
