@@ -6,7 +6,7 @@ This work can also serve as an experiments bench, we provide a modular system wh
 
 <!-- todo: insert here an image from final trained model -->
 
-Full details can be read in the upcoming [technical report](./todo).
+Full details can be read in the [technical report](https://asandei.com/projects/lora-compose/).
 
 Requirements for all tested methods:
 - training must work within 24gb VRAM, and be scalable to larger models (with quantization)
